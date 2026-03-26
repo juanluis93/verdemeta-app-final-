@@ -1,0 +1,67 @@
+name: verdemeta
+description: Aplicación vegana de tracking nutricional con SQLite
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  
+  # Base de datos SQLite
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.3
+  path_provider: ^2.1.1
+  path: ^1.8.3
+  
+  # UI y componentes
+  cupertino_icons: ^1.0.6
+  
+  # Gráficas
+  fl_chart: ^0.65.0
+  
+  # Estado (opcional, recomendado)
+  provider: ^6.1.1
+  crypto: ^3.0.3
+  
+  # HTTP para IA
+  http: ^1.1.2
+  
+  # Utilidades
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/images/logo.jpeg
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/logo.jpeg
+    - assets/images/lconologo.ico
+    - web/icons/Icon-192.png
+  
+  # Fuentes (descarga Google Fonts: Fraunces y Plus Jakarta Sans)
+  # fonts:
+  #   - family: Fraunces
+  #     fonts:
+  #       - asset: assets/fonts/Fraunces-Regular.ttf
+  #       - asset: assets/fonts/Fraunces-Bold.ttf
+  #         weight: 700
+  #   - family: PlusJakartaSans
+  #     fonts:
+  #       - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+  #       - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+  #         weight: 700
