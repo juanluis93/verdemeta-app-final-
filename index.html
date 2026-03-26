@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌿 VerdeMeta — Tu Tracker Vegano</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,700;0,900;1,300;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- Chart.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+
+<!-- Custom Styles -->
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+   LOGIN SCREEN
+   ═══════════════════════════════════════════════════ -->
+<div id="screen-login" class="screen active">
+  <div class="logo">Verde<span>Meta</span></div>
+  <p class="tagline">Inicia sesión para continuar 🌿</p>
+
+  <form class="onboard-card login-card" onsubmit="submitLogin(); return false;">
+    <div class="step-title">Bienvenida de nuevo</div>
+    <div class="step-subtitle">Si el usuario no existe, se crea automáticamente y luego pasa a mediciones.</div>
+
+    <div class="field-group">
+      <label class="field-label" for="login-user">Usuario o correo</label>
+      <input class="field-input" type="text" id="login-user" placeholder="Ej: juan@email.com" autocomplete="username"/>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="login-password">Contraseña</label>
+      <input class="field-input" type="password" id="login-password" placeholder="Tu contraseña" autocomplete="current-password"/>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Entrar</button>
+  </form>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+   ONBOARDING SCREEN
+   ═══════════════════════════════════════════════════ -->
+<div id="screen-onboard" class="screen">
+  <div class="logo">Verde<span>Meta</span></div>
+  <p class="tagline">Tu compañera vegana inteligente para alcanzar tus metas 🌿</p>
+
+  <div class="onboard-card">
+    <!-- STEP 1: Personal Information -->
+    <div class="onboard-step active" id="step1">
+      <div class="step-title">Formulario de mediciones</div>
+      <div class="step-subtitle">Completa tus datos y te llevamos al inicio de la aplicación</div>
+
+      <div class="field-group">
+        <label class="field-label" for="ob-name">Tu nombre</label>
+        <input class="field-input" type="text" id="ob-name" placeholder="Ej: Jeniffer" autocomplete="given-name"/>
+      </div>
+      
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="field-label" for="ob-age">Edad</label>
+          <input class="field-input" type="number" id="ob-age" placeholder="Años" min="10" max="100" oninput="liveBodyComp()"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="ob-gender">Género</label>
+          <select class="field-input" id="ob-gender" onchange="toggleHipField();liveBodyComp()">
+            <option value="">Selecciona</option>
+            <option value="female">Mujer</option>
+            <option value="male">Hombre</option>
+            <option value="other">Otro</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="field-label" for="ob-weight">Peso (kg)</label>
+          <input class="field-input" type="number" id="ob-weight" placeholder="kg" step="0.1" oninput="liveBodyComp()"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="ob-height">Altura (cm)</label>
+          <input class="field-input" type="number" id="ob-height" placeholder="cm" oninput="liveBodyComp()"/>
+        </div>
+      </div>
+
+      <!-- Body Composition Measurements -->
+      <div style="background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:16px;border:1px solid var(--border)">
+        <div style="font-size:.78rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">📏 Medidas para composición corporal</div>
+        <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:14px;line-height:1.5">Mide en la parte más estrecha (cintura), más ancha (cadera/muslo) y a nivel de la nuez de Adán (cuello).</div>
+        
+        <div class="fields-row" style="margin-bottom:10px">
+          <div class="field-group" style="margin-bottom:0">
+            <label class="field-label" for="ob-waist">Cintura (cm)</label>
+            <input class="field-input" type="number" id="ob-waist" placeholder="cm" step="0.5" oninput="liveBodyComp()"/>
+          </div>
+          <div class="field-group" style="margin-bottom:0">
+            <label class="field-label" for="ob-neck">Cuello (cm)</label>
+            <input class="field-input" type="number" id="ob-neck" placeholder="cm" step="0.5" oninput="liveBodyComp()"/>
+          </div>
+        </div>
+        
+        <div class="fields-row">
+          <div class="field-group" style="margin-bottom:0" id="hip-group">
+            <label class="field-label" for="ob-hip">Cadera (cm)</label>
+            <input class="field-input" type="number" id="ob-hip" placeholder="cm" step="0.5" oninput="liveBodyComp()"/>
+          </div>
+          <div class="field-group" style="margin-bottom:0">
+            <label class="field-label" for="ob-thigh">Muslo (cm) <span style="color:var(--text-dim);font-weight:400;font-size:.68rem">(opcional)</span></label>
+            <input class="field-input" type="number" id="ob-thigh" placeholder="cm" step="0.5" oninput="liveBodyComp()"/>
+          </div>
+        </div>
+        
+        <div class="fields-row" style="margin-top:10px">
+          <div class="field-group" style="margin-bottom:0">
+            <label class="field-label" for="ob-arm">Brazo (cm) <span style="color:var(--text-dim);font-weight:400;font-size:.68rem">💪 mejora precisión</span></label>
+            <input class="field-input" type="number" id="ob-arm" placeholder="cm" step="0.5" oninput="liveBodyComp()" min="15" max="55"/>
+          </div>
+          <div class="field-group" style="margin-bottom:0">
+            <label class="field-label" for="ob-calf">Pantorrilla (cm) <span style="color:var(--text-dim);font-weight:400;font-size:.68rem">🦵 mejora precisión</span></label>
+            <input class="field-input" type="number" id="ob-calf" placeholder="cm" step="0.5" oninput="liveBodyComp()" min="15" max="60"/>
+          </div>
+        </div>
+        
+        <div style="margin-top:8px;font-size:.68rem;color:var(--text-dim);line-height:1.4">
+          📐 <strong>Brazo:</strong> mide en el punto más ancho del bíceps relajado. <strong>Pantorrilla:</strong> mide en el punto más ancho de la pantorrilla de pie.
+        </div>
+      </div>
+
+      <!-- Live Body Composition Result -->
+      <div id="bodycomp-result" style="display:none;margin-bottom:16px;animation:fadeUp .3s ease">
+        <div style="background:linear-gradient(135deg,rgba(46,125,82,.08),rgba(58,153,136,.08));border:1px solid rgba(46,125,82,.2);border-radius:16px;padding:18px">
+          <div style="font-size:.75rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">🧬 Composición corporal estimada</div>
+          
+          <!-- Top row: fat / muscle / LBM -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+            <div class="bc-metric"><div id="bc-fat-pct" class="bc-val" style="color:var(--rose)">—</div><div class="bc-label">% Grasa<br>corporal</div></div>
+            <div class="bc-metric"><div id="bc-muscle-pct" class="bc-val" style="color:var(--green)">—</div><div class="bc-label">% Masa<br>muscular</div></div>
+            <div class="bc-metric"><div id="bc-lbm" class="bc-val" style="color:var(--teal)">—</div><div class="bc-label">kg Masa<br>magra</div></div>
+          </div>
+          
+          <!-- Muscle kg highlighted + bone + water -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+            <div class="bc-metric" style="background:rgba(46,125,82,.1);border:1px solid rgba(46,125,82,.25);border-radius:12px">
+              <div id="bc-muscle-kg" class="bc-val" style="color:var(--green)">—</div>
+              <div class="bc-label">kg Masa<br>muscular</div>
+            </div>
+            <div class="bc-metric"><div id="bc-bone-kg" class="bc-val" style="color:#a05a2a">—</div><div class="bc-label">kg Masa<br>ósea est.</div></div>
+            <div class="bc-metric"><div id="bc-water-kg" class="bc-val" style="color:var(--sky)">—</div><div class="bc-label">kg Agua<br>corporal</div></div>
+          </div>
+          
+          <!-- Muscle confidence badge -->
+          <div id="bc-muscle-confidence" style="margin-bottom:10px;padding:8px 12px;border-radius:10px;font-size:.72rem;font-weight:600;line-height:1.4;display:none"></div>
+          
+          <!-- Water % + SMI + State -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+            <div class="bc-metric"><div id="bc-water-pct" class="bc-val" style="color:var(--sky)">—</div><div class="bc-label">% Agua<br>corporal</div></div>
+            <div class="bc-metric"><div id="bc-muscle-idx" class="bc-val" style="color:var(--purple)">—</div><div class="bc-label">SMI<br>(kg/m²)</div></div>
+            <div class="bc-metric"><div id="bc-muscle-cat" class="bc-val" style="font-size:.75rem;color:var(--text-dim)">—</div><div class="bc-label">Estado<br>muscular</div></div>
+          </div>
+          
+          <!-- Composition bar -->
+          <div style="height:14px;background:var(--surface3);border-radius:99px;overflow:hidden;display:flex;margin-bottom:10px">
+            <div id="bar-muscle" style="height:100%;background:linear-gradient(90deg,#2e7d52,#3a9988);transition:width .6s ease"></div>
+            <div id="bar-fat" style="height:100%;background:linear-gradient(90deg,#b84d65,#c87a3a);transition:width .6s ease"></div>
+            <div id="bar-water" style="height:100%;background:linear-gradient(90deg,#3a82aa,#38bdf8);transition:width .6s ease"></div>
+            <div id="bar-bone" style="height:100%;background:#a05a2a;transition:width .6s ease"></div>
+            <div id="bar-rest" style="flex:1;background:#dff0df"></div>
+          </div>
+          
+          <!-- Bone and fluid details -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div style="background:rgba(160,90,42,.07);border:1px solid rgba(160,90,42,.18);border-radius:10px;padding:10px">
+              <div style="font-size:.72rem;font-weight:700;color:#a05a2a;margin-bottom:4px">🦴 Estructura ósea</div>
+              <div id="bc-bone-detail" style="font-size:.7rem;color:var(--text-dim);line-height:1.5"></div>
+            </div>
+            <div style="background:rgba(58,130,170,.07);border:1px solid rgba(58,130,170,.18);border-radius:10px;padding:10px">
+              <div style="font-size:.72rem;font-weight:700;color:#3a82aa;margin-bottom:4px">💧 Líquidos</div>
+              <div id="bc-fluid-detail" style="font-size:.7rem;color:var(--text-dim);line-height:1.5"></div>
+            </div>
+          </div>
+          
+          <div id="bc-category" style="font-size:.78rem;color:var(--text-dim);text-align:center;font-style:italic"></div>
+          <div style="font-size:.65rem;color:var(--text-dim);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);line-height:1.4">⚠️ Estimaciones basadas en US Navy, Heymsfield y Watson. Para mayor precisión usa DEXA o bioimpedancia.</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="ob-activity">Nivel de actividad</label>
+        <select class="field-input" id="ob-activity">
+          <option value="1.2">Sedentario (poco o ningún ejercicio)</option>
+          <option value="1.375">Ligero (1–3 días/semana)</option>
+          <option value="1.55" selected>Moderado (3–5 días/semana)</option>
+          <option value="1.725">Activo (6–7 días/semana)</option>
+          <option value="1.9">Muy activo (ejercicio intenso diario)</option>
+        </select>
+      </div>
+      
+      <button class="btn btn-primary" onclick="finishOnboard()">Guardar mediciones e ir al inicio →</button>
+    </div>
+
+    <!-- STEP 2: Goal Selection -->
+    <div class="onboard-step" id="step2">
+      <div class="step-title">¿Cuál es tu objetivo?</div>
+      <div class="step-subtitle">Esto define tus metas de macros personalizadas</div>
+      
+      <div class="goal-grid">
+        <div class="goal-card" onclick="selectGoal('deficit',event)">
+          <div class="goal-icon">🔥</div>
+          <div class="goal-name">Perder peso</div>
+          <div class="goal-desc">Déficit calórico controlado</div>
+        </div>
+        <div class="goal-card" onclick="selectGoal('maintain',event)">
+          <div class="goal-icon">⚖️</div>
+          <div class="goal-name">Mantener peso</div>
+          <div class="goal-desc">Equilibrio calórico</div>
+        </div>
+        <div class="goal-card" onclick="selectGoal('gain',event)">
+          <div class="goal-icon">💪</div>
+          <div class="goal-name">Ganar músculo</div>
+          <div class="goal-desc">Superávit proteico</div>
+        </div>
+        <div class="goal-card" onclick="selectGoal('health',event)">
+          <div class="goal-icon">🌿</div>
+          <div class="goal-name">Salud y energía</div>
+          <div class="goal-desc">Nutrición óptima vegana</div>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" onclick="finishOnboard()">¡Empezar mi viaje! 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+   MAIN APP SCREEN
+   ═══════════════════════════════════════════════════ -->
+<div id="screen-app" class="screen">
+  <!-- Top Navigation Bar -->
+  <div class="topbar">
+    <div class="topbar-logo">Verde<span>Meta</span></div>
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" onclick="showView('dashboard')" id="tab-dashboard" role="tab" aria-selected="true">
+        🏠 <span class="tab-label">Inicio</span>
+      </button>
+      <button class="nav-tab" onclick="showView('log')" id="tab-log" role="tab">
+        ➕ <span class="tab-label">Registrar</span>
+      </button>
+      <button class="nav-tab" onclick="showView('charts')" id="tab-charts" role="tab">
+        📊 <span class="tab-label">Gráficas</span>
+      </button>
+      <button class="nav-tab" onclick="showView('profile')" id="tab-profile" role="tab">
+        👤 <span class="tab-label">Perfil</span>
+      </button>
+    </nav>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm topbar-action" type="button" onclick="logoutUser()" title="Cerrar sesión">Salir</button>
+      <div class="user-avatar" id="user-avatar-top" title="Tu perfil">U</div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD VIEW -->
+  <div class="view active" id="view-dashboard" role="tabpanel">
+    <div class="greeting">Hola, <span id="greeting-name">amiga</span> 🌿</div>
+    <div class="date-line" id="today-date"></div>
+
+    <div class="summary-row">
+      <!-- Calorie Ring Card -->
+      <div class="calorie-card">
+        <div class="ring-wrap">
+          <canvas id="calRing" aria-label="Anillo de calorías"></canvas>
+          <div class="ring-center">
+            <div class="ring-cal" id="cal-consumed">0</div>
+            <div class="ring-label">kcal</div>
+          </div>
+        </div>
+        <div class="ring-meta">Meta: <strong id="cal-goal-disp">2000</strong> kcal</div>
+        <div class="ring-meta" style="margin-top:4px">Restante: <strong id="cal-remain" style="color:var(--green)">2000</strong></div>
+      </div>
+
+      <!-- Macros and Water Card -->
+      <div class="macros-card">
+        <div class="macros-title">Macronutrientes del día</div>
+        <div id="macro-bars-container"></div>
+        
+        <div style="margin-top:16px">
+          <div class="water-tracker">
+            <div class="water-title">💧 Agua — <span class="water-label" id="water-label">0 / 8 vasos</span></div>
+            <div class="water-cups" id="water-cups" role="group" aria-label="Vasos de agua"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <div class="section-title">Comidas de hoy</div>
+      <button class="btn btn-primary btn-sm" onclick="showView('log')">+ Agregar</button>
+    </div>
+    <div class="foods-list" id="foods-today"></div>
+    <div class="tips-grid" id="tips-container"></div>
+  </div>
+
+  <!-- LOG VIEW -->
+  <div class="view" id="view-log" role="tabpanel">
+    <div class="log-form-card">
+      <div class="log-form-title">➕ Registrar alimento</div>
+
+      <div style="margin-bottom:14px">
+        <label class="field-label" for="meal-time" style="margin-bottom:8px">Momento del día</label>
+        <select class="field-input" id="meal-time" style="max-width:200px">
+          <option value="Desayuno">🌅 Desayuno</option>
+          <option value="Almuerzo">☀️ Almuerzo</option>
+          <option value="Cena">🌙 Cena</option>
+          <option value="Merienda">🍎 Merienda</option>
+        </select>
+      </div>
+
+      <div class="macros-title">Alimentos veganos frecuentes</div>
+      <div class="quick-foods" id="quick-foods-grid"></div>
+
+      <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:4px">
+        <div class="macros-title">✏️ Buscar y agregar alimento</div>
+        <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:14px">Escribe el nombre y la cantidad — los macros se calculan solos 🧠</div>
+
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px;position:relative">
+            <label class="field-label" for="m-name" style="font-size:.72rem">Nombre del alimento</label>
+            <input class="food-search-input" type="text" id="m-name" placeholder="Ej: lentejas, tofu, aguacate…" 
+                   oninput="searchFoodLive(this.value)" autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox"/>
+            <div id="search-dropdown" class="search-dropdown" role="listbox"></div>
+          </div>
+          <div style="width:130px">
+            <label class="field-label" for="m-qty" style="font-size:.72rem">Cantidad (g/ml)</label>
+            <input class="food-search-input" type="number" id="m-qty" placeholder="100" min="1" oninput="updatePreview()"/>
+          </div>
+        </div>
+
+        <!-- Preview card -->
+        <div id="food-preview" class="preview-card">
+          <div class="preview-header">
+            <span id="prev-emoji" style="font-size:1.6rem">🍽️</span>
+            <div>
+              <div id="prev-name" style="font-weight:600;font-size:.95rem"></div>
+              <div id="prev-qty-label" style="font-size:.75rem;color:var(--text-dim)"></div>
+            </div>
+            <span style="margin-left:auto;font-family:'Fraunces',serif;font-size:1.4rem;font-weight:900;color:var(--green)" id="prev-cal">—</span>
+          </div>
+          <div class="preview-macros" id="prev-macros"></div>
+        </div>
+
+        <!-- Not found / AI estimation -->
+        <div id="food-not-found" style="display:none;margin-bottom:14px">
+          <div style="background:linear-gradient(135deg,rgba(46,125,82,.06),rgba(58,153,136,.06));border:1px solid rgba(46,125,82,.2);border-radius:14px;padding:16px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <span style="font-size:1.4rem">🤖</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:var(--green)">No encontrado en la base de datos</div>
+                <div style="font-size:.75rem;color:var(--text-dim)">¡Pero la IA puede estimarlo! Ingresa la cantidad y presiona el botón.</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input class="food-search-input" type="number" id="m-qty-ai" placeholder="Cantidad en g/ml" min="1" style="max-width:160px"/>
+              <button onclick="estimateWithAI()" style="background:linear-gradient(135deg,var(--green),var(--teal));color:white;border:none;border-radius:10px;padding:10px 16px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap">✨ Estimar con IA</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI loading -->
+        <div id="ai-loading" style="display:none;margin-bottom:14px">
+          <div style="background:rgba(46,125,82,.06);border:1px solid rgba(46,125,82,.15);border-radius:14px;padding:20px;text-align:center">
+            <div style="font-size:1.8rem;margin-bottom:8px;animation:pulse 1.2s infinite">🌿</div>
+            <div style="font-size:.85rem;font-weight:600;color:var(--green)">Consultando IA nutricional...</div>
+            <div style="font-size:.75rem;color:var(--text-dim);margin-top:4px">Estimando macros para <span id="ai-loading-food"></span></div>
+          </div>
+        </div>
+
+        <!-- AI result -->
+        <div id="ai-result" style="display:none;margin-bottom:14px">
+          <div style="background:linear-gradient(135deg,rgba(46,125,82,.08),rgba(58,153,136,.06));border:1px solid rgba(46,125,82,.25);border-radius:14px;padding:16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:1.1rem">✨</span>
+              <span style="font-size:.75rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px">Estimado por IA · Aprendido automáticamente</span>
+            </div>
+            <div style="font-size:.7rem;color:var(--text-dim);margin-bottom:12px" id="ai-result-note"></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+              <span id="ai-prev-emoji" style="font-size:1.6rem">🍽️</span>
+              <div>
+                <div id="ai-prev-name" style="font-weight:700;font-size:.95rem"></div>
+                <div id="ai-prev-qty" style="font-size:.75rem;color:var(--text-dim)"></div>
+              </div>
+              <span style="margin-left:auto;font-family:'Fraunces',serif;font-size:1.4rem;font-weight:900;color:var(--green)" id="ai-prev-cal">—</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:7px" id="ai-prev-macros"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" style="max-width:220px" onclick="addManualFood()">Agregar alimento ✓</button>
+      </div>
+    </div>
+
+    <!-- History Table -->
+    <div class="history-card">
+      <div class="history-head">
+        <div class="section-title" style="font-size:1.1rem">📋 Historial de registros</div>
+        <select class="field-input" id="hist-filter" style="max-width:160px;padding:7px 12px;font-size:.82rem" onchange="renderHistory()">
+          <option value="today">Hoy</option>
+          <option value="week">Esta semana</option>
+          <option value="all">Todo</option>
+        </select>
+      </div>
+      <div class="history-table-wrap">
+        <table class="history-table" id="history-table">
+          <thead><tr>
+            <th>Alimento</th><th>Momento</th><th>Cal</th><th>Prot</th><th>Carb</th><th>Grasa</th><th>Fecha</th><th></th>
+          </tr></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS VIEW -->
+  <div class="view" id="view-charts" role="tabpanel">
+    <div class="section-title" style="font-size:1.6rem;margin-bottom:6px">📊 Mis gráficas</div>
+    <div style="color:var(--text-dim);font-size:.85rem;margin-bottom:24px">Visualiza tu progreso y patrones de consumo</div>
+    
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Calorías por día</div>
+        <div class="chart-subtitle">Últimos 7 días vs tu meta</div>
+        <div class="chart-wrap"><canvas id="chart-calories"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Macros de hoy</div>
+        <div class="chart-subtitle">Distribución de nutrientes</div>
+        <div class="chart-wrap"><canvas id="chart-macros-pie"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Proteína semanal</div>
+        <div class="chart-subtitle">Gramos por día</div>
+        <div class="chart-wrap"><canvas id="chart-protein"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Micronutrientes clave</div>
+        <div class="chart-subtitle">% de meta cubierta hoy</div>
+        <div class="chart-wrap"><canvas id="chart-micro"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE VIEW -->
+  <div class="view" id="view-profile" role="tabpanel">
+    <div class="profile-grid">
+      <div class="profile-card">
+        <div class="profile-avatar-big" id="profile-avatar-big">U</div>
+        <div class="profile-name" id="profile-name-disp"></div>
+        <div class="profile-goal-tag" id="profile-goal-tag"></div>
+        <div class="profile-stats" id="profile-stats"></div>
+        <div class="reset-section">
+          <button class="btn btn-danger btn-sm" onclick="confirmReset()">🗑️ Reiniciar app</button>
+        </div>
+      </div>
+      <div>
+        <div class="goals-card" style="margin-bottom:20px">
+          <div class="goals-section-title">🎯 Tus metas diarias de macros</div>
+          <div class="goal-target-grid" id="macro-targets-disp"></div>
+        </div>
+        <div class="goals-card">
+          <div class="goals-section-title">📈 Resumen de progreso</div>
+          <div id="progress-summary" style="font-size:.85rem;color:var(--text-dim);line-height:2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title" id="modal-title"></div>
+    <p class="modal-body" id="modal-body"></p>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-sm" onclick="closeModal()">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast" style="display:none"></div>
+
+<!-- JavaScript Files -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="js/sqliteService.js"></script>
+<script src="js/foodDatabase.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

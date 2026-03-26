@@ -572,176 +572,7 @@ class FoodRepository {
   // OPERACIONES DE PERFIL
   // ═══════════════════════════════════════════════════
 
-  bool _sameDouble(double a, double b, {double epsilon = 0.01}) {
-    return (a - b).abs() <= epsilon;
-  }
-
-  bool _sameNullableDouble(double? a, double? b, {double epsilon = 0.01}) {
-    if (a == null && b == null) return true;
-    if (a == null || b == null) return false;
-    return _sameDouble(a, b, epsilon: epsilon);
-  }
-
-  bool _isSameSnapshot(ProfileRecord record, UserProfile profile) {
-    return record.goal == profile.goal &&
-        _sameDouble(record.weight, profile.weight) &&
-        _sameDouble(record.height, profile.height) &&
-        _sameNullableDouble(record.waist, profile.waist) &&
-        _sameNullableDouble(record.neck, profile.neck) &&
-        _sameNullableDouble(record.hip, profile.hip) &&
-        _sameNullableDouble(record.thigh, profile.thigh) &&
-        _sameNullableDouble(record.arm, profile.arm) &&
-        _sameNullableDouble(record.calf, profile.calf) &&
-        _sameNullableDouble(record.bodyFatPct, profile.bodyFatPct) &&
-        _sameNullableDouble(record.muscleMass, profile.muscleMass);
-  }
-
-  String _evaluateProgressStatus({
-    required ProfileRecord baseline,
-    required ProfileRecord current,
-  }) {
-    final goal = current.goal;
-    final weightDelta = current.weight - baseline.weight;
-    final bodyFatDelta =
-        current.bodyFatPct != null && baseline.bodyFatPct != null
-            ? current.bodyFatPct! - baseline.bodyFatPct!
-            : null;
-    final waistDelta = current.waist != null && baseline.waist != null
-        ? current.waist! - baseline.waist!
-        : null;
-    final muscleDelta =
-        current.muscleMass != null && baseline.muscleMass != null
-            ? current.muscleMass! - baseline.muscleMass!
-            : null;
-
-    int positive = 0;
-    int negative = 0;
-
-    switch (goal) {
-      case 'deficit':
-        if (weightDelta <= -0.5) {
-          positive++;
-        } else if (weightDelta >= 0.5) {
-          negative++;
-        }
-
-        if (bodyFatDelta != null) {
-          if (bodyFatDelta <= -0.8) {
-            positive++;
-          } else if (bodyFatDelta >= 0.8) {
-            negative++;
-          }
-        }
-
-        if (waistDelta != null) {
-          if (waistDelta <= -1.0) {
-            positive++;
-          } else if (waistDelta >= 1.0) {
-            negative++;
-          }
-        }
-        break;
-      case 'gain':
-        if (muscleDelta != null) {
-          if (muscleDelta >= 0.4) {
-            positive++;
-          } else if (muscleDelta <= -0.4) {
-            negative++;
-          }
-        }
-
-        if (weightDelta >= 0.5) {
-          positive++;
-        } else if (weightDelta <= -0.5) {
-          negative++;
-        }
-        break;
-      case 'maintain':
-      case 'health':
-        if (weightDelta.abs() <= 1.0) {
-          positive++;
-        } else {
-          negative++;
-        }
-
-        if (bodyFatDelta != null) {
-          if (bodyFatDelta <= 0.5) {
-            positive++;
-          } else {
-            negative++;
-          }
-        }
-
-        if (waistDelta != null) {
-          if (waistDelta <= 0.5) {
-            positive++;
-          } else {
-            negative++;
-          }
-        }
-        break;
-    }
-
-    if (positive > negative) return 'progressing';
-    if (negative > positive) return 'regressing';
-    return 'stable';
-  }
-
-  Future<({bool created, bool isInitial})> _saveProfileRecord(
-    UserProfile profile,
-  ) async {
-    final db = await _dbHelper.database;
-    final userId = _requiredUserId;
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-
-    final latestRows = await db.query(
-      'profile_records',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-      orderBy: 'recorded_at DESC, id DESC',
-      limit: 1,
-    );
-
-    if (latestRows.isNotEmpty) {
-      final latest = ProfileRecord.fromMap(latestRows.first);
-      if (_isSameSnapshot(latest, profile)) {
-        return (created: false, isInitial: false);
-      }
-    }
-
-    final baselineRows = await db.query(
-      'profile_records',
-      columns: ['id'],
-      where: 'user_id = ? AND is_baseline = 1',
-      whereArgs: [userId],
-      limit: 1,
-    );
-    final isInitial = baselineRows.isEmpty;
-
-    await db.insert(
-      'profile_records',
-      {
-        'user_id': userId,
-        'goal': profile.goal,
-        'weight': profile.weight,
-        'height': profile.height,
-        'waist': profile.waist,
-        'neck': profile.neck,
-        'hip': profile.hip,
-        'thigh': profile.thigh,
-        'arm': profile.arm,
-        'calf': profile.calf,
-        'body_fat_pct': profile.bodyFatPct,
-        'muscle_mass': profile.muscleMass,
-        'recorded_at': now,
-        'is_baseline': isInitial ? 1 : 0,
-      },
-    );
-
-    return (created: true, isInitial: isInitial);
-  }
-
-  Future<ProfileSaveResult> saveUserProfile(UserProfile profile) async {
+  Future<void> saveUserProfile(UserProfile profile) async {
     final db = await _dbHelper.database;
     final existing = await getUserProfile();
     final map = profile.toMap()
@@ -759,63 +590,76 @@ class FoodRepository {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    final recordState = await _saveProfileRecord(profile);
-    if (recordState.isInitial) {
-      return const ProfileSaveResult(
-        isInitialRecord: true,
-        recordCreated: true,
-        progressStatus: 'initial',
-      );
-    }
+    await _saveProfileRecord(db, profile);
+  }
 
-    final records = await getProfileRecords();
-    if (records.length < 2) {
-      return ProfileSaveResult(
-        isInitialRecord: false,
-        recordCreated: recordState.created,
-        progressStatus: 'stable',
-      );
-    }
+  Future<void> _saveProfileRecord(Database db, UserProfile profile) async {
+    final recordCount = Sqflite.firstIntValue(
+          await db.rawQuery(
+            'SELECT COUNT(*) FROM profile_records WHERE user_id = ?',
+            [_requiredUserId],
+          ),
+        ) ??
+        0;
 
-    ProfileRecord? baseline;
-    for (final record in records) {
-      if (record.isBaseline) {
-        baseline = record;
-        break;
-      }
-    }
-    baseline ??= records.last;
-    final latest = records.first;
+    final record = ProfileRecord(
+      userId: _requiredUserId,
+      goal: profile.goal,
+      weight: profile.weight,
+      height: profile.height,
+      waist: profile.waist,
+      neck: profile.neck,
+      hip: profile.hip,
+      thigh: profile.thigh,
+      arm: profile.arm,
+      calf: profile.calf,
+      bodyFatPct: profile.bodyFatPct,
+      muscleMass: profile.muscleMass,
+      recordedAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      isBaseline: recordCount == 0,
+    );
 
-    return ProfileSaveResult(
-      isInitialRecord: false,
-      recordCreated: recordState.created,
-      progressStatus: _evaluateProgressStatus(
-        baseline: baseline,
-        current: latest,
-      ),
+    await db.insert(
+      'profile_records',
+      record.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<List<ProfileRecord>> getProfileRecords() async {
+  Future<List<ProfileRecord>> getRecentProfileRecords({int limit = 2}) async {
     final db = await _dbHelper.database;
-    final maps = await db.query(
+    final List<Map<String, dynamic>> maps = await db.query(
       'profile_records',
       where: 'user_id = ?',
       whereArgs: [_requiredUserId],
-      orderBy: 'recorded_at DESC, id DESC',
+      orderBy: 'recorded_at DESC',
+      limit: limit,
     );
 
-    return maps.map((map) => ProfileRecord.fromMap(map)).toList();
+    return maps.map(ProfileRecord.fromMap).toList();
   }
 
   Future<ProfileRecord?> getBaselineProfileRecord() async {
     final db = await _dbHelper.database;
-    final maps = await db.query(
+    final List<Map<String, dynamic>> maps = await db.query(
       'profile_records',
       where: 'user_id = ? AND is_baseline = 1',
       whereArgs: [_requiredUserId],
-      orderBy: 'recorded_at ASC, id ASC',
+      orderBy: 'recorded_at ASC',
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return ProfileRecord.fromMap(maps.first);
+  }
+
+  Future<ProfileRecord?> getLatestProfileRecord() async {
+    final db = await _dbHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'profile_records',
+      where: 'user_id = ?',
+      whereArgs: [_requiredUserId],
+      orderBy: 'recorded_at DESC',
       limit: 1,
     );
 

@@ -1,0 +1,13 @@
+{
+  "dart.flutterSdkPath": "C:\\Users\\juanl\\OneDrive\\Desktop\\flutter",
+  "dart.sdkPath": "C:\\Users\\juanl\\OneDrive\\Desktop\\flutter\\bin\\cache\\dart-sdk",
+  "dart.projectSearchDepth": 5,
+  "dart.analysisExcludedFolders": [
+    "flutter-migration/build",
+    "flutter-migration/.dart_tool"
+  ],
+  "files.watcherExclude": {
+    "**/flutter-migration/build/**": true,
+    "**/flutter-migration/.dart_tool/**": true
+  }
+}

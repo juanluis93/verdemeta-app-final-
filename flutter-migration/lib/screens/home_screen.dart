@@ -657,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 selectedLanguage == 'es' ? 'Tema oscuro' : 'Dark mode';
             final notificationsLabel =
                 selectedLanguage == 'es' ? 'Notificaciones' : 'Notifications';
-            final feedbackTitle = 'Fedback';
+            final feedbackTitle = 'Feedback';
             final feedbackDescription = selectedLanguage == 'es'
                 ? 'Sigue tu progreso de usuario'
                 : 'Track your user progress';
@@ -799,14 +799,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openFeedbackProgress() async {
+    final baselineRecord = await _repo.getBaselineProfileRecord();
+    final latestRecord = await _repo.getLatestProfileRecord();
+    if (!mounted) return;
+
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (context) {
-        final totalMeals = _todayLog.length;
-        final totalCalories = _todayTotals.calories.toStringAsFixed(0);
-        final waterCups = _todayWaterCups;
-
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -815,44 +815,151 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Fedback',
+                  'Feedback',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _t(
-                    'Progreso del usuario de hoy',
-                    'Today\'s user progress',
+                  _t('Antes y despues de tus medidas',
+                      'Before and after your measurements'),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                if (latestRecord == null || baselineRecord == null)
+                  Text(
+                    _t(
+                      'Guarda tus medidas en "Mediciones" para ver el progreso.',
+                      'Save your measurements in "Measurements" to see progress.',
+                    ),
+                  )
+                else if (latestRecord.id == baselineRecord.id)
+                  Text(
+                    _t(
+                      'Guarda tus medidas otra vez para comparar el antes y despues.',
+                      'Save your measurements again to compare before and after.',
+                    ),
+                  )
+                else
+                  _buildMeasurementsComparison(
+                    before: baselineRecord,
+                    after: latestRecord,
                   ),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 14),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.restaurant_menu_rounded),
-                  title: Text(_t('Comidas registradas', 'Meals logged')),
-                  trailing: Text('$totalMeals'),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.local_fire_department_rounded),
-                  title: Text(_t('Calorias del dia', 'Daily calories')),
-                  trailing: Text('$totalCalories kcal'),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.water_drop_rounded),
-                  title: Text(_t('Vasos de agua', 'Water cups')),
-                  trailing: Text('$waterCups/8'),
-                ),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  Widget _buildMeasurementsComparison({
+    required ProfileRecord before,
+    required ProfileRecord after,
+  }) {
+    final textStyle = Theme.of(context).textTheme.bodyMedium;
+    return Column(
+      children: [
+        Row(
+          children: [
+            const Expanded(flex: 2, child: SizedBox()),
+            Expanded(
+              child: Text(
+                _t('Antes', 'Before'),
+                textAlign: TextAlign.end,
+                style: textStyle?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _t('Despues', 'After'),
+                textAlign: TextAlign.end,
+                style: textStyle?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        _buildMeasureRow(
+          label: _t('Peso (kg)', 'Weight (kg)'),
+          before: before.weight,
+          after: after.weight,
+        ),
+        _buildMeasureRow(
+          label: _t('Cintura (cm)', 'Waist (cm)'),
+          before: before.waist,
+          after: after.waist,
+        ),
+        _buildMeasureRow(
+          label: _t('Cuello (cm)', 'Neck (cm)'),
+          before: before.neck,
+          after: after.neck,
+        ),
+        _buildMeasureRow(
+          label: _t('Cadera (cm)', 'Hip (cm)'),
+          before: before.hip,
+          after: after.hip,
+        ),
+        _buildMeasureRow(
+          label: _t('Muslo (cm)', 'Thigh (cm)'),
+          before: before.thigh,
+          after: after.thigh,
+        ),
+        _buildMeasureRow(
+          label: _t('Brazo (cm)', 'Arm (cm)'),
+          before: before.arm,
+          after: after.arm,
+        ),
+        _buildMeasureRow(
+          label: _t('Pantorrilla (cm)', 'Calf (cm)'),
+          before: before.calf,
+          after: after.calf,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMeasureRow({
+    required String label,
+    required double? before,
+    required double? after,
+  }) {
+    final textStyle = Theme.of(context).textTheme.bodyMedium;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: textStyle),
+          ),
+          Expanded(
+            child: Text(
+              _formatMeasure(before),
+              textAlign: TextAlign.end,
+              style: textStyle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _formatMeasure(after),
+              textAlign: TextAlign.end,
+              style: textStyle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatMeasure(double? value) {
+    if (value == null) return '-';
+    return value.toStringAsFixed(1);
   }
 
   void _showComingSoon(String name) {
@@ -1826,7 +1933,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.trending_up_rounded),
-            title: const Text('Fedback'),
+            title: const Text('Feedback'),
           ),
         ),
         const PopupMenuDivider(),

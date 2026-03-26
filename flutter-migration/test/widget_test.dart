@@ -4,7 +4,7 @@ import 'package:verdemeta/main.dart';
 
 void main() {
   testWidgets('Renderiza la app principal', (WidgetTester tester) async {
-    await tester.pumpWidget(VerdeMeta());
+    await tester.pumpWidget(const VerdeMeta());
     await tester.pump();
 
     expect(find.byType(VerdeMeta), findsOneWidget);

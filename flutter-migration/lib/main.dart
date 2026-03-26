@@ -2,6 +2,7 @@
 /// MAIN - VerdeMeta Flutter App
 /// Punto de entrada de la aplicación
 /// ═══════════════════════════════════════════════════
+library;
 
 import 'package:flutter/material.dart';
 
