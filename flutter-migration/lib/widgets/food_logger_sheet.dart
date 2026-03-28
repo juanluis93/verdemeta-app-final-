@@ -28,7 +28,7 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
   final _searchFocus = FocusNode();
 
   List<Food> _results = [];
-  Food? _selectedFood;
+  final List<({Food food, double quantity})> _selectedFoods = [];
   bool _searching = false;
   bool _saving = false;
   String _mealTime = 'Desayuno';
@@ -150,29 +150,19 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
   }
 
   Future<void> _saveFood() async {
-    if (_saving) return;
-
-    final selected = _selectedFood;
-    final quantity = _parseQuantity();
-
-    if (selected == null) {
-      return;
-    }
-
-    if (quantity == null || quantity <= 0 || quantity > 5000) {
-      return;
-    }
+    if (_saving || _selectedFoods.isEmpty) return;
 
     setState(() => _saving = true);
 
-    final entry = FoodLogEntry.fromFood(
-      food: selected,
-      quantity: quantity,
-      mealTime: _mealTime,
-    );
-
     try {
-      await widget.repository.logFood(entry);
+      for (final item in _selectedFoods) {
+        final entry = FoodLogEntry.fromFood(
+          food: item.food,
+          quantity: item.quantity,
+          mealTime: _mealTime,
+        );
+        await widget.repository.logFood(entry);
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (_) {
@@ -183,9 +173,6 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final quantity = _parseQuantity() ?? 100;
-    final selectedNutrition = _selectedFood?.calculateForQuantity(quantity);
-
     return SafeArea(
       top: false,
       child: Padding(
@@ -311,46 +298,68 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                 ),
               ],
             ),
-            if (_selectedFood != null && selectedNutrition != null) ...[
+            if (_selectedFoods.isNotEmpty) ...[
               SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Color(0xFFDCEBDD)),
+              Text(
+                'Seleccionados (${_selectedFoods.length})',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: Color(0xFF5E8570),
                 ),
-                child: Row(
-                  children: [
-                    Text(
-                      _selectedFood!.emoji,
-                      style: TextStyle(fontSize: 26),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: 120),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedFoods.length,
+                  separatorBuilder: (_, __) => SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final item = _selectedFoods[index];
+                    return Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Color(0xFFEAF8EF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Color(0xFF86C8A0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            _selectedFood!.name,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF254836),
-                            ),
+                          Text(item.food.emoji, style: TextStyle(fontSize: 18)),
+                          SizedBox(width: 6),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.food.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Color(0xFF254836),
+                                ),
+                              ),
+                              Text(
+                                '${item.quantity.toInt()}g',
+                                style: TextStyle(fontSize: 10, color: Color(0xFF6A8D76)),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 2),
-                          Text(
-                            '${selectedNutrition.calories.toStringAsFixed(0)} kcal • P ${selectedNutrition.protein.toStringAsFixed(1)}g • C ${selectedNutrition.carbs.toStringAsFixed(1)}g • G ${selectedNutrition.fat.toStringAsFixed(1)}g',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6A8D76),
-                            ),
+                          SizedBox(width: 4),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(),
+                            icon: Icon(Icons.close_rounded, size: 16, color: Color(0xFF2E8A5E)),
+                            onPressed: () => setState(() => _selectedFoods.removeAt(index)),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -391,23 +400,22 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                           separatorBuilder: (_, __) => SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             final food = _results[index];
-                            final selected = _selectedFood?.id == food.id &&
-                                _selectedFood?.name == food.name;
-
                             return InkWell(
-                              onTap: () => setState(() => _selectedFood = food),
+                              onTap: () {
+                                final qty = _parseQuantity() ?? 100;
+                                if (qty <= 0) return;
+                                setState(() {
+                                  _selectedFoods.add((food: food, quantity: qty));
+                                });
+                              },
                               borderRadius: BorderRadius.circular(14),
                               child: Container(
                                 padding: EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: selected
-                                      ? Color(0xFFEAF8EF)
-                                      : Colors.white,
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: selected
-                                        ? Color(0xFF86C8A0)
-                                        : Color(0xFFDCEBDD),
+                                    color: Color(0xFFDCEBDD),
                                   ),
                                 ),
                                 child: Row(
@@ -438,11 +446,11 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                                         ],
                                       ),
                                     ),
-                                    if (selected)
-                                      Icon(
-                                        Icons.check_circle_rounded,
-                                        color: Color(0xFF2E8A5E),
-                                      ),
+                                    Icon(
+                                      Icons.add_circle_outline_rounded,
+                                      color: Color(0xFF2E8A5E),
+                                      size: 20,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -463,7 +471,11 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                       )
                     : Icon(Icons.bookmark_add_rounded),
                 label: Text(
-                  _saving ? 'Guardando...' : 'Guardar en registros de hoy',
+                  _saving
+                      ? 'Guardando...'
+                      : (_selectedFoods.isEmpty
+                          ? 'Selecciona alimentos'
+                          : 'Guardar ${_selectedFoods.length} items en hoy'),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(0xFF2E8A5E),

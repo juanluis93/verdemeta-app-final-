@@ -653,7 +653,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _setWaterCups(int cups) async {
-    final nextValue = cups.clamp(0, 8);
+    final nextValue = cups.clamp(0, 24);
 
     setState(() => _todayWaterCups = nextValue);
 
@@ -2620,17 +2620,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _t(
-              '💧 AGUA — $_todayWaterCups / 8 VASOS (${_waterLiters.toStringAsFixed(1)} L)',
-              '💧 WATER — $_todayWaterCups / 8 CUPS (${_waterLiters.toStringAsFixed(1)} L)',
-            ),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.4,
-              color: Color(0xFF4C89B9),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _t(
+                    '💧 AGUA — $_todayWaterCups / 8 VASOS (${_waterLiters.toStringAsFixed(1)} L)',
+                    '💧 WATER — $_todayWaterCups / 8 CUPS (${_waterLiters.toStringAsFixed(1)} L)',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                    color: Color(0xFF4C89B9),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onLongPress: () {
+                  if (_todayWaterCups > 0) {
+                    _setWaterCups(_todayWaterCups - 1);
+                    Feedback.forLongPress(context);
+                  }
+                },
+                child: IconButton(
+                  onPressed: () => _setWaterCups(_todayWaterCups + 1),
+                  icon: const Icon(Icons.add_circle_outline_rounded,
+                      color: Color(0xFF4C89B9)),
+                  tooltip: _t('Añadir agua (Mantén presionado para restar)',
+                      'Add water (Hold to subtract)'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Wrap(
