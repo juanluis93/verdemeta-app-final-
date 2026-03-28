@@ -2157,6 +2157,53 @@ function buildCharts() {
       }
     }
   });
+
+  // ── Water Bar Chart ──
+  if (charts.water) charts.water.destroy();
+  const waterData = days.map(d => parseInt(waterByDate[d] || '0', 10));
+  
+  charts.water = new Chart(document.getElementById('chart-water').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Vasos de Agua',
+          data: waterData,
+          backgroundColor: 'rgba(58, 130, 170, 0.55)',
+          borderRadius: 8,
+          borderSkipped: false
+        },
+        {
+          label: 'Meta',
+          data: days.map(() => 8),
+          type: 'line',
+          borderColor: '#3a82aa',
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: tickColor, font: { size: 11 } }
+        }
+      },
+      scales: { 
+        x: axisStyle, 
+        y: {
+          ...axisStyle,
+          beginAtZero: true,
+          suggestedMax: 10
+        }
+      }
+    }
+  });
 }
 
 /**

@@ -8,6 +8,7 @@ import '../models/food_models.dart';
 import '../repositories/food_repository.dart';
 import '../widgets/food_logger_sheet.dart';
 import 'profile_measurements_screen.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 enum _HomeMenuAction { settings, feedback, measurements, logout }
 
@@ -56,6 +57,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _loading = true;
   Timer? _dayChangeTimer;
   String _lastLoadedDayKey = '';
+  List<double> _weeklyCalories = [];
+  List<int> _weeklyWater = [];
+  List<String> _weeklyLabels = [];
 
   bool get _isSpanish => _currentLocale.languageCode == 'es';
 
@@ -129,6 +133,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final profile = await _repo.getUserProfile();
       final emojiIndex = _buildEmojiIndex(allFoods);
 
+      // Load weekly stats for charts
+      final weekStats = await _repo.getDailyTotalsForDays(7);
+      final List<double> weeklyCal = [];
+      final List<int> weeklyWater = [];
+      final List<String> weeklyLabels = [];
+      final now = DateTime.now();
+      final esDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+      final enDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+      for (int i = 6; i >= 0; i--) {
+        final d = now.subtract(Duration(days: i));
+        final key = _dateKey(d);
+        final stats = weekStats[key] ?? NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+        weeklyCal.add(stats.calories);
+
+        final water = await _repo.getWaterIntake(key);
+        weeklyWater.add(water);
+        weeklyLabels.add(_isSpanish ? esDays[d.weekday - 1] : enDays[d.weekday - 1]);
+      }
+
       if (!mounted) return;
       setState(() {
         _quickFoods = quickFoods;
@@ -138,6 +162,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _profile = profile;
         _emojiByFoodId = emojiIndex.byId;
         _emojiByFoodName = emojiIndex.byName;
+        _weeklyCalories = weeklyCal;
+        _weeklyWater = weeklyWater;
+        _weeklyLabels = weeklyLabels;
         _lastLoadedDayKey = todayKey;
         _loading = false;
       });
@@ -155,6 +182,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _profile = null;
         _emojiByFoodId = fallbackEmojiIndex.byId;
         _emojiByFoodName = fallbackEmojiIndex.byName;
+        _weeklyCalories = List.filled(7, 0.0);
+        _weeklyWater = List.filled(7, 0);
+        _weeklyLabels = List.generate(7, (i) => '');
         _lastLoadedDayKey = todayKey;
         _loadError = kIsWeb
             ? _t(
@@ -430,7 +460,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  String get _todayKey => DateTime.now().toIso8601String().split('T')[0];
+  String _dateKey(DateTime date) => date.toIso8601String().split('T')[0];
+
+  String get _todayKey => _dateKey(DateTime.now());
 
   double get _calorieGoal => _profile?.calorieTarget ?? 2000;
 
@@ -1342,10 +1374,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     onRefresh: _loadData,
                     child: _activeSection == 0
                         ? _buildInicioContent()
-                        : _buildRegistroContent(
-                            calorieProgress: calorieProgress,
-                            calorieRemaining: calorieRemaining,
-                          ),
+                        : (_activeSection == 1
+                            ? _buildRegistroContent(
+                                calorieProgress: calorieProgress,
+                                calorieRemaining: calorieRemaining,
+                              )
+                            : _buildChartsContent()),
                   ),
           ),
         ],
@@ -1661,6 +1695,208 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildChartsContent() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+      children: [
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTopBar(),
+                const SizedBox(height: 16),
+                Text(
+                  _t('Estadísticas', 'Statistics'),
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF244B35),
+                    height: 1.05,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildCalorieChartCard(),
+                const SizedBox(height: 20),
+                _buildWaterChartCard(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCalorieChartCard() {
+    double maxCal = 0;
+    for (final c in _weeklyCalories) if (c > maxCal) maxCal = c;
+    if (maxCal < _calorieGoal) maxCal = _calorieGoal;
+    if (maxCal == 0) maxCal = 2000;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _t('Calorías por día', 'Daily Calories'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 200,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxCal * 1.2,
+                barTouchData: BarTouchData(enabled: true),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= _weeklyLabels.length) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(_weeklyLabels[idx], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(
+                      y: _calorieGoal,
+                      color: const Color(0xFFE96C79).withOpacity(0.4),
+                      strokeWidth: 2,
+                      dashArray: [5, 5],
+                    ),
+                  ],
+                ),
+                barGroups: List.generate(_weeklyCalories.length, (i) {
+                  return BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: _weeklyCalories[i],
+                        color: const Color(0xFF2E8A5E),
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWaterChartCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _t('Consumo de Agua', 'Water Intake'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 200,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: 10,
+                barTouchData: BarTouchData(enabled: true),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= _weeklyLabels.length) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(_weeklyLabels[idx], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(
+                      y: 8,
+                      color: const Color(0xFF38BDF8).withOpacity(0.5),
+                      strokeWidth: 2,
+                      dashArray: [5, 5],
+                    ),
+                  ],
+                ),
+                barGroups: List.generate(_weeklyWater.length, (i) {
+                  return BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: _weeklyWater[i].toDouble(),
+                        color: const Color(0xFF38BDF8),
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMainBottomNav() {
     return SafeArea(
       top: false,
@@ -1700,7 +1936,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: _buildBottomNavItem(
                 icon: Icons.bar_chart_rounded,
                 label: _t('Gráficas', 'Charts'),
-                onTap: () => _showComingSoon(_t('Gráficas', 'Charts')),
+                active: _activeSection == 2,
+                onTap: () => setState(() => _activeSection = 2),
               ),
             ),
             Expanded(
