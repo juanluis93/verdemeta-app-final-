@@ -343,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ? await _repo.registerUser(username: username, password: password)
           : await _repo.loginUser(username: username, password: password);
 
-        await _persistSession(account.id);
+      await _persistSession(account.id);
 
       final scopedRepo = _repo.forUser(account);
       final hasProfile = await scopedRepo.hasUserProfile();
