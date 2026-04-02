@@ -60,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<double> _weeklyCalories = [];
   List<int> _weeklyWater = [];
   List<String> _weeklyLabels = [];
+  int _waterUpdateVersion = 0;
 
   bool get _isSpanish => _currentLocale.languageCode == 'es';
 
@@ -145,12 +146,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       for (int i = 6; i >= 0; i--) {
         final d = now.subtract(Duration(days: i));
         final key = _dateKey(d);
-        final stats = weekStats[key] ?? NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+        final stats = weekStats[key] ??
+            NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
         weeklyCal.add(stats.calories);
 
         final water = await _repo.getWaterIntake(key);
         weeklyWater.add(water);
-        weeklyLabels.add(_isSpanish ? esDays[d.weekday - 1] : enDays[d.weekday - 1]);
+        weeklyLabels
+            .add(_isSpanish ? esDays[d.weekday - 1] : enDays[d.weekday - 1]);
       }
 
       if (!mounted) return;
@@ -653,20 +656,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _setWaterCups(int cups) async {
-    final nextValue = cups.clamp(0, 24);
+    final nextValue = cups.clamp(0, 24).toInt();
+    final updateVersion = ++_waterUpdateVersion;
 
-    setState(() => _todayWaterCups = nextValue);
+    setState(() {
+      _todayWaterCups = nextValue;
+      if (_weeklyWater.isNotEmpty) {
+        final nextWeekly = List<int>.from(_weeklyWater);
+        nextWeekly[nextWeekly.length - 1] = nextValue;
+        _weeklyWater = nextWeekly;
+      }
+    });
 
     if (kIsWeb) return;
 
     try {
       await _repo.saveWaterIntake(nextValue, _todayKey);
+      await _refreshWeeklyWaterSeries(
+        expectedTodayCups: nextValue,
+        updateVersion: updateVersion,
+      );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || updateVersion != _waterUpdateVersion) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo guardar el agua de hoy.')),
       );
     }
+  }
+
+  Future<void> _refreshWeeklyWaterSeries({
+    required int expectedTodayCups,
+    required int updateVersion,
+  }) async {
+    final now = DateTime.now();
+    final weeklyWater = <int>[];
+
+    for (int i = 6; i >= 0; i--) {
+      final dateKey = _dateKey(now.subtract(Duration(days: i)));
+      weeklyWater.add(await _repo.getWaterIntake(dateKey));
+    }
+
+    if (!mounted || updateVersion != _waterUpdateVersion) return;
+
+    if (weeklyWater.isNotEmpty) {
+      weeklyWater[weeklyWater.length - 1] = expectedTodayCups;
+    }
+
+    setState(() {
+      _weeklyWater = weeklyWater;
+      _todayWaterCups = expectedTodayCups;
+    });
   }
 
   Future<void> _openDisplaySettings() async {
@@ -689,7 +728,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 selectedLanguage == 'es' ? 'Tema oscuro' : 'Dark mode';
             final notificationsLabel =
                 selectedLanguage == 'es' ? 'Notificaciones' : 'Notifications';
-            final feedbackTitle = 'Feedback';
+            const feedbackTitle = 'Feedback';
             final feedbackDescription = selectedLanguage == 'es'
                 ? 'Sigue tu progreso de usuario'
                 : 'Track your user progress';
@@ -1710,7 +1749,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _buildTopBar(),
                 const SizedBox(height: 16),
                 Text(
-                  _t('Estadísticas', 'Statistics'),
+                  _t('Gráficas diarias', 'Daily Charts'),
                   style: const TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -1732,7 +1771,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildCalorieChartCard() {
     double maxCal = 0;
-    for (final c in _weeklyCalories) if (c > maxCal) maxCal = c;
+    for (final c in _weeklyCalories) {
+      if (c > maxCal) maxCal = c;
+    }
     if (maxCal < _calorieGoal) maxCal = _calorieGoal;
     if (maxCal == 0) maxCal = 2000;
 
@@ -1753,7 +1794,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _t('Calorías por día', 'Daily Calories'),
+            _t('Gráfica de calorías diarias', 'Daily calories chart'),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
@@ -1771,17 +1812,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final idx = value.toInt();
-                        if (idx < 0 || idx >= _weeklyLabels.length) return const SizedBox();
+                        if (idx < 0 || idx >= _weeklyLabels.length)
+                          return const SizedBox();
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(_weeklyLabels[idx], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          child: Text(_weeklyLabels[idx],
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.grey)),
                         );
                       },
                     ),
                   ),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
@@ -1817,6 +1864,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildWaterChartCard() {
+    double maxWater = 8;
+    for (final water in _weeklyWater) {
+      if (water > maxWater) maxWater = water.toDouble();
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1834,7 +1886,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _t('Consumo de Agua', 'Water Intake'),
+            _t('Gráfica de agua diaria', 'Daily water chart'),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
@@ -1843,7 +1895,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
-                maxY: 10,
+                maxY: math.max(10, maxWater * 1.2),
                 barTouchData: BarTouchData(enabled: true),
                 titlesData: FlTitlesData(
                   show: true,
@@ -1852,17 +1904,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final idx = value.toInt();
-                        if (idx < 0 || idx >= _weeklyLabels.length) return const SizedBox();
+                        if (idx < 0 || idx >= _weeklyLabels.length)
+                          return const SizedBox();
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(_weeklyLabels[idx], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          child: Text(_weeklyLabels[idx],
+                              style: const TextStyle(
+                                  fontSize: 10, color: Colors.grey)),
                         );
                       },
                     ),
                   ),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
@@ -1988,21 +2046,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildHomeTopBar() {
     return Row(
       children: [
-        SizedBox(
-          width: 14,
-          height: 14,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Transform.scale(
-              scale: 1.6,
-              alignment: Alignment.centerLeft,
-              child: Image.asset(
-                'assets/images/logo.jpeg',
-                fit: BoxFit.cover,
-                alignment: Alignment.centerLeft,
-              ),
-            ),
-          ),
+        Image.asset(
+          'assets/images/logo.jpeg',
+          height: 22,
+          fit: BoxFit.fitHeight,
+          alignment: Alignment.centerLeft,
         ),
         const Spacer(),
         _buildUserMenu(
@@ -2113,21 +2161,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildTopBar() {
     return Row(
       children: [
-        SizedBox(
-          width: 29,
-          height: 20,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Transform.scale(
-              scale: 1.6,
-              alignment: Alignment.centerLeft,
-              child: Image.asset(
-                'assets/images/logo.jpeg',
-                fit: BoxFit.cover,
-                alignment: Alignment.centerLeft,
-              ),
-            ),
-          ),
+        Image.asset(
+          'assets/images/logo.jpeg',
+          height: 50,
+          width: 50,
+          fit: BoxFit.fitHeight,
+          alignment: Alignment.centerLeft,
         ),
         const Spacer(),
         _buildUserMenu(

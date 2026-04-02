@@ -1,7 +1,7 @@
 name: verdemeta
 description: Aplicación vegana de tracking nutricional con SQLite
 publish_to: 'none'
-version: 1.5.0+1
+version: 3.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -33,6 +33,7 @@ dependencies:
   
   # Utilidades
   intl: ^0.20.2
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

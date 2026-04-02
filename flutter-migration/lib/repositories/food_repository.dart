@@ -257,6 +257,19 @@ class FoodRepository {
     return UserAccount.fromMap(maps.first);
   }
 
+  Future<UserAccount?> getUserById(int userId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return UserAccount.fromMap(maps.first);
+  }
+
   Future<UserAccount> loginUser({
     required String username,
     required String password,

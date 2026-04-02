@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../repositories/food_repository.dart';
 import 'home_screen.dart';
@@ -26,6 +27,8 @@ class LoginScreen extends StatefulWidget {
 enum _AuthMode { login, register }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _sessionUserIdKey = 'session_user_id';
+
   final FoodRepository _repo = FoodRepository();
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -35,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
   late ThemeMode _currentThemeMode;
 
   bool _submitting = false;
+  bool _restoringSession = true;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   _AuthMode _mode = _AuthMode.login;
@@ -63,6 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _currentLocale = widget.locale;
     _currentThemeMode = widget.themeMode;
+    _restoreSession();
   }
 
   @override
@@ -113,7 +118,68 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _persistSession(int userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_sessionUserIdKey, userId);
+  }
+
+  Future<void> _clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionUserIdKey);
+  }
+
+  Future<void> _restoreSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUserId = prefs.getInt(_sessionUserIdKey);
+
+      if (savedUserId == null) return;
+
+      final account = await _repo.getUserById(savedUserId);
+      if (account == null) {
+        await _clearSession();
+        return;
+      }
+
+      final scopedRepo = _repo.forUser(account);
+      final hasProfile = await scopedRepo.hasUserProfile();
+      if (!mounted) return;
+
+      if (hasProfile) {
+        await _openHome(scopedRepo);
+        return;
+      }
+
+      if (!mounted) return;
+
+      final result = await Navigator.of(context).push<dynamic>(
+        MaterialPageRoute(
+          builder: (_) => ProfileMeasurementsScreen(repository: scopedRepo),
+        ),
+      );
+
+      final saved = switch (result) {
+        true => true,
+        {'saved': true} => true,
+        _ => false,
+      };
+
+      if (!mounted) return;
+      if (saved) {
+        await _openHome(scopedRepo);
+      }
+    } catch (_) {
+      await _clearSession();
+    } finally {
+      if (mounted) {
+        setState(() => _restoringSession = false);
+      }
+    }
+  }
+
   Future<void> _handleLogout(BuildContext context) async {
+    await _clearSession();
+    if (!context.mounted) return;
     _passwordCtrl.clear();
     _confirmPasswordCtrl.clear();
     await Navigator.of(context).pushAndRemoveUntil(
@@ -277,6 +343,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ? await _repo.registerUser(username: username, password: password)
           : await _repo.loginUser(username: username, password: password);
 
+        await _persistSession(account.id);
+
       final scopedRepo = _repo.forUser(account);
       final hasProfile = await scopedRepo.hasUserProfile();
 
@@ -346,6 +414,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_restoringSession) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1B2722) : Colors.white;

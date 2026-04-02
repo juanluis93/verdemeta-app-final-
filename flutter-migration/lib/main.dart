@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'database/database_helper.dart';
 import 'screens/login_screen.dart';
@@ -23,8 +24,37 @@ class VerdeMeta extends StatefulWidget {
 }
 
 class _VerdeMetaState extends State<VerdeMeta> {
+  static const _localeCodeKey = 'app_locale_code';
+  static const _themeModeKey = 'app_theme_mode';
+
   ThemeMode _themeMode = ThemeMode.light;
   Locale _locale = const Locale('es', 'ES');
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreDisplayPreferences();
+  }
+
+  Future<void> _restoreDisplayPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedLocaleCode = prefs.getString(_localeCodeKey);
+    final savedThemeMode = prefs.getString(_themeModeKey);
+
+    final restoredLocale = savedLocaleCode == 'en'
+        ? const Locale('en', 'US')
+        : const Locale('es', 'ES');
+
+    final restoredThemeMode = savedThemeMode == ThemeMode.dark.name
+        ? ThemeMode.dark
+        : ThemeMode.light;
+
+    if (!mounted) return;
+    setState(() {
+      _locale = restoredLocale;
+      _themeMode = restoredThemeMode;
+    });
+  }
 
   void _setLocale(Locale locale) {
     final normalized = locale.languageCode == 'es'
@@ -33,11 +63,17 @@ class _VerdeMetaState extends State<VerdeMeta> {
 
     if (_locale == normalized) return;
     setState(() => _locale = normalized);
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setString(_localeCodeKey, normalized.languageCode),
+    );
   }
 
   void _setThemeMode(ThemeMode mode) {
     if (_themeMode == mode) return;
     setState(() => _themeMode = mode);
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setString(_themeModeKey, mode.name),
+    );
   }
 
   ThemeData _buildTheme(Brightness brightness) {
