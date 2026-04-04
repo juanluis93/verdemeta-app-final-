@@ -9,10 +9,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'database/database_helper.dart';
 import 'screens/login_screen.dart';
+import 'services/daily_macro_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DatabaseHelper.initializeDatabaseFactory();
+  await DailyMacroNotificationService.initialize();
   runApp(const VerdeMeta());
 }
 

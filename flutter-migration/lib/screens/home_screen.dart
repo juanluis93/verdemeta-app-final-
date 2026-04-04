@@ -3,9 +3,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/food_models.dart';
 import '../repositories/food_repository.dart';
+import '../services/daily_macro_notification_service.dart';
 import '../widgets/food_logger_sheet.dart';
 import 'profile_measurements_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -35,6 +37,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  static const _notificationsEnabledBaseKey =
+      'daily_macro_notifications_enabled';
+
   late final FoodRepository _repo;
   late Locale _currentLocale;
   late ThemeMode _currentThemeMode;
@@ -74,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _currentLocale = widget.locale;
     _currentThemeMode = widget.themeMode;
     _lastLoadedDayKey = _todayKey;
+    unawaited(_restoreNotificationPreference());
     _startDayChangeWatcher();
     _loadData();
   }
@@ -171,6 +177,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _lastLoadedDayKey = todayKey;
         _loading = false;
       });
+
+      unawaited(_syncDailyMacroNotification());
     } catch (e) {
       if (!mounted) return;
 
@@ -200,7 +208,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               );
         _loading = false;
       });
+
+      unawaited(_syncDailyMacroNotification());
     }
+  }
+
+  String get _notificationsPreferenceKey {
+    final userId = _repo.currentUserId ?? 0;
+    return '${_notificationsEnabledBaseKey}_$userId';
+  }
+
+  Future<void> _restoreNotificationPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final restored = prefs.getBool(_notificationsPreferenceKey) ?? true;
+
+    if (!mounted) return;
+    setState(() => _notificationsEnabled = restored);
+    await _syncDailyMacroNotification();
+  }
+
+  Future<void> _setNotificationsEnabled(bool enabled) async {
+    if (_notificationsEnabled == enabled) return;
+
+    setState(() => _notificationsEnabled = enabled);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notificationsPreferenceKey, enabled);
+
+    if (enabled) {
+      final granted =
+          await DailyMacroNotificationService.requestPermissionIfNeeded();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _t(
+                'Activa el permiso de notificaciones del sistema para recibir el resumen diario.',
+                'Enable system notification permission to receive your daily summary.',
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    await _syncDailyMacroNotification();
+  }
+
+  Future<void> _syncDailyMacroNotification() async {
+    if (!_notificationsEnabled) {
+      await DailyMacroNotificationService.cancelEndOfDaySummary();
+      return;
+    }
+
+    await DailyMacroNotificationService.scheduleEndOfDaySummary(
+      isSpanish: _isSpanish,
+      totals: _todayTotals,
+      profile: _profile,
+    );
   }
 
   ({Map<int, String> byId, Map<String, String> byName}) _buildEmojiIndex(
@@ -457,6 +522,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
 
         if (shouldLogout == true && mounted) {
+          await DailyMacroNotificationService.cancelEndOfDaySummary();
+          if (!mounted) return;
           await widget.onLogoutRequested(context);
         }
         break;
@@ -805,7 +872,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         value: notificationsEnabled,
                         onChanged: (value) {
                           setModalState(() => notificationsEnabled = value);
-                          setState(() => _notificationsEnabled = value);
+                          unawaited(_setNotificationsEnabled(value));
                         },
                       ),
                       const SizedBox(height: 4),
