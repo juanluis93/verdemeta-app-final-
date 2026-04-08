@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -125,4 +126,22 @@ class DailyMacroNotificationService {
     await initialize();
     await _plugin.cancel(_notificationId);
   }
+=======
+class DailyMacroNotificationService {
+  static Future<void> initialize() async {
+    // Placeholder service: keeps app flow stable until full notifications are reintroduced.
+  }
+
+  static Future<bool> requestPermissionIfNeeded() async {
+    return true;
+  }
+
+  static Future<void> cancelEndOfDaySummary() async {}
+
+  static Future<void> scheduleEndOfDaySummary({
+    required bool isSpanish,
+    required dynamic totals,
+    required dynamic profile,
+  }) async {}
+>>>>>>> b9d1389 (fix: restaurar servicio de notificaciones y habilitar desugaring android)
 }
