@@ -1,16 +1,206 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/food_models.dart';
 import '../repositories/food_repository.dart';
+import '../services/daily_macro_notification_service.dart';
 import '../widgets/food_logger_sheet.dart';
+import '../presentation/screens/planificar_home_screen.dart';
+import '../presentation/screens/recipe_today_screen.dart';
 import 'profile_measurements_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 enum _HomeMenuAction { settings, feedback, measurements, logout }
+
+class _PlannerRequest {
+  final int year;
+  final int month;
+  final bool prioritizeQuickFoods;
+  final bool manualMode;
+
+  const _PlannerRequest({
+    required this.year,
+    required this.month,
+    required this.prioritizeQuickFoods,
+    required this.manualMode,
+  });
+}
+
+class _PlannerValidationResult {
+  final bool isValid;
+  final List<String> suggestions;
+
+  const _PlannerValidationResult({
+    required this.isValid,
+    required this.suggestions,
+  });
+}
+
+class _PlannedMealItem {
+  final String mealKey;
+  final Food food;
+  final double grams;
+
+  const _PlannedMealItem({
+    required this.mealKey,
+    required this.food,
+    required this.grams,
+  });
+
+  NutritionInfo get nutrition => food.calculateForQuantity(grams);
+
+  Map<String, dynamic> toMap() {
+    return {
+      'meal_key': mealKey,
+      'grams': grams,
+      'food': {
+        'id': food.id,
+        'name': food.name,
+        'emoji': food.emoji,
+        'calories': food.calories,
+        'protein': food.protein,
+        'carbs': food.carbs,
+        'fat': food.fat,
+        'fiber': food.fiber,
+        'sugar': food.sugar,
+        'iron': food.iron,
+        'calcium': food.calcium,
+        'b12': food.b12,
+        'zinc': food.zinc,
+        'is_quick_food': food.isQuickFood ? 1 : 0,
+        'created_at': food.createdAt,
+      },
+    };
+  }
+
+  factory _PlannedMealItem.fromMap(Map<String, dynamic> map) {
+    final foodMap = Map<String, dynamic>.from(map['food'] as Map);
+    return _PlannedMealItem(
+      mealKey: map['meal_key'] as String,
+      grams: (map['grams'] as num).toDouble(),
+      food: Food.fromMap(foodMap),
+    );
+  }
+}
+
+class _DailyDietPlan {
+  final DateTime date;
+  final List<_PlannedMealItem> items;
+  final NutritionInfo totals;
+
+  const _DailyDietPlan({
+    required this.date,
+    required this.items,
+    required this.totals,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'date': date.toIso8601String(),
+      'items': items.map((item) => item.toMap()).toList(),
+    };
+  }
+
+  factory _DailyDietPlan.fromMap(Map<String, dynamic> map) {
+    final itemsRaw = (map['items'] as List<dynamic>? ?? const []);
+    final items = itemsRaw
+        .map(
+            (item) => _PlannedMealItem.fromMap(Map<String, dynamic>.from(item)))
+        .toList();
+
+    var totals = NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+    for (final item in items) {
+      totals = totals + item.nutrition;
+    }
+
+    return _DailyDietPlan(
+      date: DateTime.parse(map['date'] as String),
+      items: items,
+      totals: totals,
+    );
+  }
+}
+
+class _MonthlyDietPlan {
+  final int year;
+  final int month;
+  final double targetCalories;
+  final double targetProtein;
+  final double targetCarbs;
+  final double targetFat;
+  final List<_DailyDietPlan> days;
+
+  const _MonthlyDietPlan({
+    required this.year,
+    required this.month,
+    required this.targetCalories,
+    required this.targetProtein,
+    required this.targetCarbs,
+    required this.targetFat,
+    required this.days,
+  });
+
+  int get dayCount => days.length;
+
+  NutritionInfo get averageTotals {
+    if (days.isEmpty) {
+      return NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+    }
+
+    var combined = NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+    for (final day in days) {
+      combined = combined + day.totals;
+    }
+
+    final divisor = days.length;
+    return NutritionInfo(
+      calories: combined.calories / divisor,
+      protein: combined.protein / divisor,
+      carbs: combined.carbs / divisor,
+      fat: combined.fat / divisor,
+      fiber: combined.fiber / divisor,
+      sugar: combined.sugar / divisor,
+      iron: combined.iron / divisor,
+      calcium: combined.calcium / divisor,
+      b12: combined.b12 / divisor,
+      zinc: combined.zinc / divisor,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'year': year,
+      'month': month,
+      'target_calories': targetCalories,
+      'target_protein': targetProtein,
+      'target_carbs': targetCarbs,
+      'target_fat': targetFat,
+      'days': days.map((day) => day.toMap()).toList(),
+    };
+  }
+
+  factory _MonthlyDietPlan.fromMap(Map<String, dynamic> map) {
+    final daysRaw = (map['days'] as List<dynamic>? ?? const []);
+    final days = daysRaw
+        .map((day) => _DailyDietPlan.fromMap(Map<String, dynamic>.from(day)))
+        .toList();
+
+    return _MonthlyDietPlan(
+      year: map['year'] as int,
+      month: map['month'] as int,
+      targetCalories: (map['target_calories'] as num).toDouble(),
+      targetProtein: (map['target_protein'] as num).toDouble(),
+      targetCarbs: (map['target_carbs'] as num).toDouble(),
+      targetFat: (map['target_fat'] as num).toDouble(),
+      days: days,
+    );
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   final FoodRepository repository;
@@ -35,6 +225,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  static const _notificationsEnabledBaseKey =
+      'daily_macro_notifications_enabled';
+  static const _monthlyPlannerBaseKey = 'monthly_diet_plan_v2';
+  static const _buildStamp = 'DIETA-2026-04-05-C';
+
   late final FoodRepository _repo;
   late Locale _currentLocale;
   late ThemeMode _currentThemeMode;
@@ -60,6 +255,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<double> _weeklyCalories = [];
   List<int> _weeklyWater = [];
   List<String> _weeklyLabels = [];
+  _MonthlyDietPlan? _monthlyDietPlan;
+  bool _monthlyPlanIsValid = false;
+  Map<int, List<String>> _planSuggestionsByDay = {};
   int _waterUpdateVersion = 0;
 
   bool get _isSpanish => _currentLocale.languageCode == 'es';
@@ -74,6 +272,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _currentLocale = widget.locale;
     _currentThemeMode = widget.themeMode;
     _lastLoadedDayKey = _todayKey;
+    unawaited(_restoreNotificationPreference());
     _startDayChangeWatcher();
     _loadData();
   }
@@ -171,6 +370,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _lastLoadedDayKey = todayKey;
         _loading = false;
       });
+
+      unawaited(_restoreMonthlyPlanFromStorage());
+
+      unawaited(_syncDailyMacroNotification());
     } catch (e) {
       if (!mounted) return;
 
@@ -200,7 +403,98 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               );
         _loading = false;
       });
+
+      unawaited(_restoreMonthlyPlanFromStorage());
+
+      unawaited(_syncDailyMacroNotification());
     }
+  }
+
+  String get _monthlyPlannerStorageKey {
+    final userId = _repo.currentUserId ?? 0;
+    return '${_monthlyPlannerBaseKey}_$userId';
+  }
+
+  Future<void> _saveMonthlyPlanToStorage(_MonthlyDietPlan plan) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonPayload = jsonEncode(plan.toMap());
+    await prefs.setString(_monthlyPlannerStorageKey, jsonPayload);
+  }
+
+  Future<void> _restoreMonthlyPlanFromStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_monthlyPlannerStorageKey);
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final plan = _MonthlyDietPlan.fromMap(decoded);
+      final validation = _evaluateMonthlyPlan(plan);
+
+      if (!mounted) return;
+      setState(() {
+        _monthlyDietPlan = plan;
+        _monthlyPlanIsValid = validation.$1;
+        _planSuggestionsByDay = validation.$2;
+      });
+    } catch (_) {
+      // Ignore malformed saved plans and keep current state.
+    }
+  }
+
+  String get _notificationsPreferenceKey {
+    final userId = _repo.currentUserId ?? 0;
+    return '${_notificationsEnabledBaseKey}_$userId';
+  }
+
+  Future<void> _restoreNotificationPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final restored = prefs.getBool(_notificationsPreferenceKey) ?? true;
+
+    if (!mounted) return;
+    setState(() => _notificationsEnabled = restored);
+    await _syncDailyMacroNotification();
+  }
+
+  Future<void> _setNotificationsEnabled(bool enabled) async {
+    if (_notificationsEnabled == enabled) return;
+
+    setState(() => _notificationsEnabled = enabled);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notificationsPreferenceKey, enabled);
+
+    if (enabled) {
+      final granted =
+          await DailyMacroNotificationService.requestPermissionIfNeeded();
+      if (!granted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _t(
+                'Activa el permiso de notificaciones del sistema para recibir el resumen diario.',
+                'Enable system notification permission to receive your daily summary.',
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    await _syncDailyMacroNotification();
+  }
+
+  Future<void> _syncDailyMacroNotification() async {
+    if (!_notificationsEnabled) {
+      await DailyMacroNotificationService.cancelEndOfDaySummary();
+      return;
+    }
+
+    await DailyMacroNotificationService.scheduleEndOfDaySummary(
+      isSpanish: _isSpanish,
+      totals: _todayTotals,
+      profile: _profile,
+    );
   }
 
   ({Map<int, String> byId, Map<String, String> byName}) _buildEmojiIndex(
@@ -457,6 +751,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
 
         if (shouldLogout == true && mounted) {
+          await DailyMacroNotificationService.cancelEndOfDaySummary();
+          if (!mounted) return;
           await widget.onLogoutRequested(context);
         }
         break;
@@ -564,6 +860,1608 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       fiber: fiber,
       calcium: calcium,
       zinc: zinc,
+    );
+  }
+
+  String _monthLabel(int month) {
+    const esMonths = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+    const enMonths = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    final index = month.clamp(1, 12) - 1;
+    return _isSpanish ? esMonths[index] : enMonths[index];
+  }
+
+  String _mealLabel(String mealKey) {
+    return switch (mealKey) {
+      'breakfast' => _t('Desayuno', 'Breakfast'),
+      'lunch' => _t('Almuerzo', 'Lunch'),
+      'snack' => _t('Merienda', 'Snack'),
+      'dinner' => _t('Cena', 'Dinner'),
+      _ => _t('Comida', 'Meal'),
+    };
+  }
+
+  NutritionInfo _computePlanTotals(List<_PlannedMealItem> items) {
+    var totals = NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
+    for (final item in items) {
+      totals = totals + item.nutrition;
+    }
+    return totals;
+  }
+
+  double get _targetCalories => _profile?.calorieTarget ?? _calorieGoal;
+  double get _targetProtein => _profile?.proteinTarget ?? 120;
+  double get _targetCarbs => _profile?.carbsTarget ?? 220;
+  double get _targetFat => _profile?.fatTarget ?? 70;
+
+  _PlannerValidationResult _validateDailyPlan(_DailyDietPlan dayPlan) {
+    final totals = dayPlan.totals;
+    final microTargets = _dailyMicroTargets();
+    final suggestions = <String>[];
+
+    bool kcalOk = false;
+    if (_targetCalories > 0) {
+      final ratio = totals.calories / _targetCalories;
+      kcalOk = ratio >= 0.94 && ratio <= 1.08;
+      if (!kcalOk) {
+        suggestions.add(
+          _t(
+            ratio < 1
+                ? 'Sube porciones de carbohidratos complejos o añade un snack energético.'
+                : 'Reduce porciones de alimentos densos en calorías para equilibrar el día.',
+            ratio < 1
+                ? 'Increase complex carb portions or add an energy snack.'
+                : 'Reduce energy-dense portions to rebalance the day.',
+          ),
+        );
+      }
+    }
+
+    final proteinOk =
+        _targetProtein <= 0 ? true : totals.protein >= _targetProtein * 0.93;
+    if (!proteinOk) {
+      suggestions.add(_t(
+        'Añade una fuente alta en proteína vegetal (tofu, tempeh, legumbres).',
+        'Add a high plant-protein source (tofu, tempeh, legumes).',
+      ));
+    }
+
+    final carbsOk = _targetCarbs <= 0
+        ? true
+        : totals.carbs >= _targetCarbs * 0.9 &&
+            totals.carbs <= _targetCarbs * 1.12;
+    if (!carbsOk) {
+      suggestions.add(_t(
+        totals.carbs < _targetCarbs
+            ? 'Completa carbohidratos con avena, quinoa, arroz integral o fruta.'
+            : 'Reduce carbohidratos refinados y prioriza porciones moderadas.',
+        totals.carbs < _targetCarbs
+            ? 'Complete carbs with oats, quinoa, brown rice, or fruit.'
+            : 'Reduce refined carbs and keep moderate portions.',
+      ));
+    }
+
+    final fatOk = _targetFat <= 0
+        ? true
+        : totals.fat >= _targetFat * 0.9 && totals.fat <= _targetFat * 1.15;
+    if (!fatOk) {
+      suggestions.add(_t(
+        totals.fat < _targetFat
+            ? 'Agrega grasas saludables (aguacate, nueces o semillas).'
+            : 'Recorta grasas densas y reparte mejor entre comidas.',
+        totals.fat < _targetFat
+            ? 'Add healthy fats (avocado, nuts, or seeds).'
+            : 'Reduce dense fats and spread intake across meals.',
+      ));
+    }
+
+    final fiberOk = totals.fiber >= microTargets.fiber * 0.9;
+    final ironOk = totals.iron >= microTargets.iron * 0.9;
+    final calciumOk = totals.calcium >= microTargets.calcium * 0.88;
+    final zincOk = totals.zinc >= microTargets.zinc * 0.9;
+    final b12Ok = totals.b12 >= 2.2;
+
+    if (!fiberOk) {
+      suggestions.add(_t(
+        'Falta fibra: añade verduras, legumbres y semillas de chía/linaza.',
+        'Fiber is low: add vegetables, legumes, and chia/flax seeds.',
+      ));
+    }
+    if (!ironOk) {
+      suggestions.add(_t(
+        'Falta hierro: prioriza lentejas, garbanzos y espinaca con vitamina C.',
+        'Iron is low: prioritize lentils, chickpeas, and spinach with vitamin C.',
+      ));
+    }
+    if (!calciumOk) {
+      suggestions.add(_t(
+        'Falta calcio: usa bebidas vegetales fortificadas o tofu alto en calcio.',
+        'Calcium is low: use fortified plant milk or calcium-set tofu.',
+      ));
+    }
+    if (!zincOk) {
+      suggestions.add(_t(
+        'Falta zinc: incluye semillas, frutos secos y legumbres.',
+        'Zinc is low: include seeds, nuts, and legumes.',
+      ));
+    }
+    if (!b12Ok) {
+      suggestions.add(_t(
+        'B12 baja: considera alimentos fortificados o suplementación guiada.',
+        'B12 is low: consider fortified foods or guided supplementation.',
+      ));
+    }
+
+    final isValid = kcalOk &&
+        proteinOk &&
+        carbsOk &&
+        fatOk &&
+        fiberOk &&
+        ironOk &&
+        calciumOk &&
+        zincOk &&
+        b12Ok;
+
+    return _PlannerValidationResult(isValid: isValid, suggestions: suggestions);
+  }
+
+  (bool, Map<int, List<String>>) _evaluateMonthlyPlan(_MonthlyDietPlan plan) {
+    var allValid = true;
+    final suggestionsByDay = <int, List<String>>{};
+
+    for (final day in plan.days) {
+      final validation = _validateDailyPlan(day);
+      if (!validation.isValid) {
+        allValid = false;
+        suggestionsByDay[day.date.day] = validation.suggestions;
+      }
+    }
+
+    return (allValid, suggestionsByDay);
+  }
+
+  Future<Food?> _pickReplacementFoodDialog({
+    required List<Food> foods,
+    required Food currentFood,
+  }) async {
+    if (!mounted) return null;
+
+    final orderedFoods = [
+      ...foods.where((food) => food.id == currentFood.id),
+      ...foods.where((food) => food.id != currentFood.id),
+    ];
+
+    return showDialog<Food>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(_t('Reemplazar plato', 'Replace dish')),
+          content: SizedBox(
+            width: 430,
+            height: 360,
+            child: ListView.separated(
+              itemCount: orderedFoods.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final food = orderedFoods[index];
+                return ListTile(
+                  leading:
+                      Text(food.emoji, style: const TextStyle(fontSize: 20)),
+                  title: Text(food.name),
+                  subtitle: Text(
+                    '${food.calories.toStringAsFixed(0)} kcal/100g · '
+                    'P ${food.protein.toStringAsFixed(1)} · '
+                    'C ${food.carbs.toStringAsFixed(1)} · '
+                    'G ${food.fat.toStringAsFixed(1)}',
+                  ),
+                  trailing: food.id == currentFood.id
+                      ? Text(
+                          _t('Actual', 'Current'),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6A8D76),
+                          ),
+                        )
+                      : null,
+                  onTap: () => Navigator.of(context).pop(food),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_t('Cancelar', 'Cancel')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openDayCustomization(DateTime selectedDate) async {
+    final plan = _monthlyDietPlan;
+    if (plan == null) return;
+
+    if (selectedDate.year != plan.year || selectedDate.month != plan.month) {
+      return;
+    }
+
+    final dayIndex = selectedDate.day - 1;
+    if (dayIndex < 0 || dayIndex >= plan.days.length) return;
+
+    final foodsFromDb = await _repo.getAllFoods();
+    final foods = foodsFromDb.isNotEmpty
+        ? foodsFromDb
+        : (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods);
+
+    if (!mounted) return;
+
+    var editedDay = plan.days[dayIndex];
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final validation = _validateDailyPlan(editedDay);
+            final mealOrder = ['breakfast', 'lunch', 'snack', 'dinner'];
+
+            return AlertDialog(
+              title: Text(
+                _t(
+                  'Personalizar día ${selectedDate.day}',
+                  'Customize day ${selectedDate.day}',
+                ),
+              ),
+              content: SizedBox(
+                width: 450,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: validation.isValid
+                              ? const Color(0xFFEAF7EE)
+                              : const Color(0xFFFFF4E5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: validation.isValid
+                                ? const Color(0xFFB8DABA)
+                                : const Color(0xFFFFCC80),
+                          ),
+                        ),
+                        child: Text(
+                          validation.isValid
+                              ? _t(
+                                  'Día válido. Puedes guardar cambios.',
+                                  'Day is valid. You can save changes.',
+                                )
+                              : _t(
+                                  'Día no válido. Cambia platos y el sistema ajustará porciones automáticamente.',
+                                  'Day is not valid. Change dishes and the system will auto-adjust portions.',
+                                ),
+                          style: TextStyle(
+                            color: validation.isValid
+                                ? const Color(0xFF2E8A5E)
+                                : const Color(0xFF8A5C2E),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (!validation.isValid &&
+                          validation.suggestions.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        ...validation.suggestions.take(4).map(
+                              (hint) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  '• $hint',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6A8D76),
+                                  ),
+                                ),
+                              ),
+                            ),
+                      ],
+                      const SizedBox(height: 10),
+                      ...mealOrder.map((mealKey) {
+                        final indexed = editedDay.items
+                            .asMap()
+                            .entries
+                            .where((entry) => entry.value.mealKey == mealKey)
+                            .toList();
+
+                        return Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9FCF9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFDDEBDD)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _mealLabel(mealKey),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF2A4B38),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () async {
+                                    final baseFood = foods.isNotEmpty
+                                        ? foods.first
+                                        : _webPreviewFoods.first;
+                                    final selectedFood =
+                                        await _pickReplacementFoodDialog(
+                                      foods: foods,
+                                      currentFood: baseFood,
+                                    );
+                                    if (selectedFood == null) return;
+
+                                    final mutableItems =
+                                        List<_PlannedMealItem>.from(
+                                            editedDay.items)
+                                          ..add(
+                                            _PlannedMealItem(
+                                              mealKey: mealKey,
+                                              food: selectedFood,
+                                              grams: 120,
+                                            ),
+                                          );
+
+                                    var candidate = _DailyDietPlan(
+                                      date: editedDay.date,
+                                      items: mutableItems,
+                                      totals: _computePlanTotals(mutableItems),
+                                    );
+
+                                    for (var i = 0; i < 2; i++) {
+                                      candidate =
+                                          _rebalanceDailyPlanForNutrients(
+                                        candidate,
+                                        foods,
+                                      );
+                                    }
+
+                                    setDialogState(() {
+                                      editedDay = candidate;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.add_rounded),
+                                  label: Text(_t('Agregar plato', 'Add dish')),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              if (indexed.isEmpty)
+                                Text(
+                                  _t(
+                                    'No hay platos en esta comida. Usa "Agregar plato".',
+                                    'No dishes in this meal yet. Use "Add dish".',
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6A8D76),
+                                  ),
+                                ),
+                              ...indexed.map((entry) {
+                                final itemIndex = entry.key;
+                                final item = entry.value;
+
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 2),
+                                  child: Row(
+                                    children: [
+                                      Text(item.food.emoji,
+                                          style: const TextStyle(fontSize: 18)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${item.food.name} · ${item.grams.toStringAsFixed(0)}g',
+                                          style: const TextStyle(
+                                            color: Color(0xFF325441),
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () async {
+                                          final replacement =
+                                              await _pickReplacementFoodDialog(
+                                            foods: foods,
+                                            currentFood: item.food,
+                                          );
+                                          if (replacement == null) return;
+
+                                          final mutableItems =
+                                              List<_PlannedMealItem>.from(
+                                            editedDay.items,
+                                          );
+                                          mutableItems[itemIndex] =
+                                              _PlannedMealItem(
+                                            mealKey: item.mealKey,
+                                            food: replacement,
+                                            grams: item.grams,
+                                          );
+
+                                          var candidate = _DailyDietPlan(
+                                            date: editedDay.date,
+                                            items: mutableItems,
+                                            totals: _computePlanTotals(
+                                                mutableItems),
+                                          );
+
+                                          for (var i = 0; i < 2; i++) {
+                                            candidate =
+                                                _rebalanceDailyPlanForNutrients(
+                                              candidate,
+                                              foods,
+                                            );
+                                          }
+
+                                          setDialogState(() {
+                                            editedDay = candidate;
+                                          });
+                                        },
+                                        child: Text(_t('Cambiar', 'Swap')),
+                                      ),
+                                      IconButton(
+                                        onPressed: () {
+                                          final mutableItems =
+                                              List<_PlannedMealItem>.from(
+                                            editedDay.items,
+                                          )..removeAt(itemIndex);
+
+                                          final candidate = _DailyDietPlan(
+                                            date: editedDay.date,
+                                            items: mutableItems,
+                                            totals: _computePlanTotals(
+                                                mutableItems),
+                                          );
+
+                                          setDialogState(() {
+                                            editedDay = candidate;
+                                          });
+                                        },
+                                        icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                          color: Color(0xFFB84D65),
+                                        ),
+                                        tooltip:
+                                            _t('Quitar plato', 'Remove dish'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(_t('Cancelar', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: validation.isValid
+                      ? () async {
+                          final current = _monthlyDietPlan;
+                          if (current == null) return;
+
+                          final updatedDays =
+                              List<_DailyDietPlan>.from(current.days);
+                          updatedDays[dayIndex] = editedDay;
+                          final updatedPlan = _MonthlyDietPlan(
+                            year: current.year,
+                            month: current.month,
+                            targetCalories: current.targetCalories,
+                            targetProtein: current.targetProtein,
+                            targetCarbs: current.targetCarbs,
+                            targetFat: current.targetFat,
+                            days: updatedDays,
+                          );
+
+                          final evaluation = _evaluateMonthlyPlan(updatedPlan);
+
+                          if (!mounted) return;
+                          setState(() {
+                            _monthlyDietPlan = updatedPlan;
+                            _monthlyPlanIsValid = evaluation.$1;
+                            _planSuggestionsByDay = evaluation.$2;
+                          });
+
+                          await _saveMonthlyPlanToStorage(updatedPlan);
+
+                          if (!context.mounted) return;
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                _t(
+                                  'Día guardado y rebalanceado correctamente.',
+                                  'Day saved and rebalanced successfully.',
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: Text(_t('Guardar día', 'Save day')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Food _pickHighestNutrientFood(
+    List<Food> foods,
+    double Function(Food food) nutrient,
+    Food fallback,
+  ) {
+    if (foods.isEmpty) return fallback;
+    final ranked = List<Food>.from(foods)
+      ..sort((a, b) => nutrient(b).compareTo(nutrient(a)));
+    return ranked.first;
+  }
+
+  _DailyDietPlan _rebalanceDailyPlanForNutrients(
+    _DailyDietPlan dayPlan,
+    List<Food> foods,
+  ) {
+    final microTargets = _dailyMicroTargets();
+    var items = List<_PlannedMealItem>.from(dayPlan.items);
+    var totals = _computePlanTotals(items);
+
+    final sourceFoods = foods.where((food) => food.calories > 0).toList();
+    if (sourceFoods.isEmpty) return dayPlan;
+
+    final fiberFood = _pickHighestNutrientFood(
+      sourceFoods.where((food) => food.fiber > 0).toList(),
+      (food) => food.fiber,
+      sourceFoods.first,
+    );
+    final ironFood = _pickHighestNutrientFood(
+      sourceFoods.where((food) => food.iron > 0).toList(),
+      (food) => food.iron,
+      sourceFoods.first,
+    );
+    final calciumFood = _pickHighestNutrientFood(
+      sourceFoods.where((food) => food.calcium > 0).toList(),
+      (food) => food.calcium,
+      sourceFoods.first,
+    );
+    final b12Food = _pickHighestNutrientFood(
+      sourceFoods.where((food) => food.b12 > 0).toList(),
+      (food) => food.b12,
+      sourceFoods.first,
+    );
+    final zincFood = _pickHighestNutrientFood(
+      sourceFoods.where((food) => food.zinc > 0).toList(),
+      (food) => food.zinc,
+      sourceFoods.first,
+    );
+
+    void addItemForDeficit(
+      double deficit,
+      double macroPer100,
+      Food food,
+      String mealKey,
+    ) {
+      if (deficit <= 0 || macroPer100 <= 0) return;
+      final grams = _clampGrams((deficit / macroPer100) * 100 * 1.05);
+      items.add(_PlannedMealItem(mealKey: mealKey, food: food, grams: grams));
+      totals = _computePlanTotals(items);
+    }
+
+    addItemForDeficit(
+        microTargets.fiber - totals.fiber, fiberFood.fiber, fiberFood, 'lunch');
+    addItemForDeficit(
+        microTargets.iron - totals.iron, ironFood.iron, ironFood, 'dinner');
+    addItemForDeficit(
+      microTargets.calcium - totals.calcium,
+      calciumFood.calcium,
+      calciumFood,
+      'snack',
+    );
+    addItemForDeficit(2.4 - totals.b12, b12Food.b12, b12Food, 'breakfast');
+    addItemForDeficit(
+        microTargets.zinc - totals.zinc, zincFood.zinc, zincFood, 'dinner');
+
+    final kcalRatio =
+        (_targetCalories / math.max(1, totals.calories)).clamp(0.9, 1.08);
+    items = items
+        .map(
+          (item) => _PlannedMealItem(
+            mealKey: item.mealKey,
+            food: item.food,
+            grams: _clampGrams(item.grams * kcalRatio),
+          ),
+        )
+        .toList();
+
+    totals = _computePlanTotals(items);
+    return _DailyDietPlan(date: dayPlan.date, items: items, totals: totals);
+  }
+
+  double _macroDeficit(double target, double current) {
+    return math.max(0, target - current);
+  }
+
+  double _safeMacroPer100(double value) {
+    if (value <= 0) return 0.1;
+    return value;
+  }
+
+  double _clampGrams(double grams) => grams.clamp(20.0, 420.0).toDouble();
+
+  Food _pickFood(List<Food> foods, int seed, {Food? fallback}) {
+    if (foods.isNotEmpty) {
+      return foods[seed % foods.length];
+    }
+    if (fallback != null) return fallback;
+    return _webPreviewFoods.first;
+  }
+
+  List<Food> _sortByMacroDensity(
+    List<Food> foods,
+    double Function(Food food) macro,
+  ) {
+    final result = List<Food>.from(foods);
+    result.sort((a, b) {
+      final densityA = macro(a) / (a.calories <= 0 ? 1.0 : a.calories);
+      final densityB = macro(b) / (b.calories <= 0 ? 1.0 : b.calories);
+      return densityB.compareTo(densityA);
+    });
+    return result;
+  }
+
+  _DailyDietPlan _generateDailyPlan({
+    required int day,
+    required int month,
+    required int year,
+    required List<Food> foods,
+    required double calorieTarget,
+    required double proteinTarget,
+    required double carbsTarget,
+    required double fatTarget,
+  }) {
+    final validFoods = foods.where((food) => food.calories > 0).toList();
+    final sourceFoods = validFoods.isNotEmpty ? validFoods : _webPreviewFoods;
+
+    final proteinFoods = _sortByMacroDensity(
+      sourceFoods.where((f) => f.protein >= 6).toList(),
+      (f) => f.protein,
+    );
+    final carbFoods = _sortByMacroDensity(
+      sourceFoods.where((f) => f.carbs >= 10).toList(),
+      (f) => f.carbs,
+    );
+    final fatFoods = _sortByMacroDensity(
+      sourceFoods.where((f) => f.fat >= 7).toList(),
+      (f) => f.fat,
+    );
+    final fiberFoods = _sortByMacroDensity(
+      sourceFoods.where((f) => f.fiber >= 2).toList(),
+      (f) => f.fiber,
+    );
+
+    final seed = (year * 1000) + (month * 40) + day;
+    final proteinMain = _pickFood(proteinFoods, seed);
+    final proteinSecondary =
+        _pickFood(proteinFoods, seed + 7, fallback: proteinMain);
+    final carbsMain = _pickFood(carbFoods, seed + 3, fallback: proteinMain);
+    final carbsSecondary = _pickFood(carbFoods, seed + 11, fallback: carbsMain);
+    final fatMain = _pickFood(fatFoods, seed + 5, fallback: proteinMain);
+    final veggieMain = _pickFood(fiberFoods, seed + 13, fallback: carbsMain);
+
+    final dayFactor = 0.92 + ((seed % 17) / 100);
+    final items = <_PlannedMealItem>[
+      _PlannedMealItem(
+        mealKey: 'breakfast',
+        food: carbsMain,
+        grams: _clampGrams(150 * dayFactor),
+      ),
+      _PlannedMealItem(
+        mealKey: 'breakfast',
+        food: proteinMain,
+        grams: _clampGrams(130 * dayFactor),
+      ),
+      _PlannedMealItem(
+        mealKey: 'lunch',
+        food: proteinSecondary,
+        grams: _clampGrams(190 * dayFactor),
+      ),
+      _PlannedMealItem(
+        mealKey: 'lunch',
+        food: carbsSecondary,
+        grams: _clampGrams(180 * dayFactor),
+      ),
+      _PlannedMealItem(
+        mealKey: 'snack',
+        food: fatMain,
+        grams: _clampGrams(38 * dayFactor),
+      ),
+      _PlannedMealItem(
+        mealKey: 'dinner',
+        food: proteinMain,
+        grams: _clampGrams(170 * dayFactor),
+      ),
+      _PlannedMealItem(
+        mealKey: 'dinner',
+        food: veggieMain,
+        grams: _clampGrams(200 * dayFactor),
+      ),
+    ];
+
+    var mutableItems = items;
+    var totals = _computePlanTotals(mutableItems);
+
+    final proteinDeficit = _macroDeficit(proteinTarget, totals.protein);
+    final carbsDeficit = _macroDeficit(carbsTarget, totals.carbs);
+    final fatDeficit = _macroDeficit(fatTarget, totals.fat);
+
+    if (proteinDeficit > 0.1) {
+      final extraProteinGrams =
+          (proteinDeficit / _safeMacroPer100(proteinMain.protein)) * 100;
+      mutableItems = mutableItems
+          .map(
+            (item) => item.food.id == proteinMain.id
+                ? _PlannedMealItem(
+                    mealKey: item.mealKey,
+                    food: item.food,
+                    grams: _clampGrams(item.grams + (extraProteinGrams * 0.35)),
+                  )
+                : item,
+          )
+          .toList();
+      totals = _computePlanTotals(mutableItems);
+    }
+
+    if (carbsDeficit > 0.1) {
+      final extraCarbGrams =
+          (carbsDeficit / _safeMacroPer100(carbsMain.carbs)) * 100;
+      mutableItems = mutableItems
+          .map(
+            (item) => item.food.id == carbsMain.id
+                ? _PlannedMealItem(
+                    mealKey: item.mealKey,
+                    food: item.food,
+                    grams: _clampGrams(item.grams + (extraCarbGrams * 0.45)),
+                  )
+                : item,
+          )
+          .toList();
+      totals = _computePlanTotals(mutableItems);
+    }
+
+    if (fatDeficit > 0.1) {
+      final extraFatGrams = (fatDeficit / _safeMacroPer100(fatMain.fat)) * 100;
+      mutableItems = mutableItems
+          .map(
+            (item) => item.food.id == fatMain.id
+                ? _PlannedMealItem(
+                    mealKey: item.mealKey,
+                    food: item.food,
+                    grams: _clampGrams(item.grams + (extraFatGrams * 0.7)),
+                  )
+                : item,
+          )
+          .toList();
+      totals = _computePlanTotals(mutableItems);
+    }
+
+    final calorieRatio = calorieTarget > 0
+        ? (calorieTarget / math.max(1.0, totals.calories)).clamp(0.85, 1.18)
+        : 1.0;
+
+    mutableItems = mutableItems
+        .map(
+          (item) => _PlannedMealItem(
+            mealKey: item.mealKey,
+            food: item.food,
+            grams: _clampGrams(item.grams * calorieRatio),
+          ),
+        )
+        .toList();
+
+    totals = _computePlanTotals(mutableItems);
+
+    return _DailyDietPlan(
+      date: DateTime(year, month, day),
+      items: mutableItems,
+      totals: totals,
+    );
+  }
+
+  _MonthlyDietPlan _generateMonthlyDietPlan({
+    required int year,
+    required int month,
+    required List<Food> foods,
+    required double calorieTarget,
+    required double proteinTarget,
+    required double carbsTarget,
+    required double fatTarget,
+  }) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final plans = <_DailyDietPlan>[];
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dayPlan = _generateDailyPlan(
+        day: day,
+        month: month,
+        year: year,
+        foods: foods,
+        calorieTarget: calorieTarget,
+        proteinTarget: proteinTarget,
+        carbsTarget: carbsTarget,
+        fatTarget: fatTarget,
+      );
+
+      for (var attempt = 0; attempt < 3; attempt++) {
+        final validation = _validateDailyPlan(dayPlan);
+        if (validation.isValid) break;
+        dayPlan = _rebalanceDailyPlanForNutrients(dayPlan, foods);
+      }
+
+      plans.add(dayPlan);
+    }
+
+    return _MonthlyDietPlan(
+      year: year,
+      month: month,
+      targetCalories: calorieTarget,
+      targetProtein: proteinTarget,
+      targetCarbs: carbsTarget,
+      targetFat: fatTarget,
+      days: plans,
+    );
+  }
+
+  _MonthlyDietPlan _generateManualMonthlyPlan({
+    required int year,
+    required int month,
+    required List<Food> foods,
+    required double calorieTarget,
+    required double proteinTarget,
+    required double carbsTarget,
+    required double fatTarget,
+  }) {
+    final validFoods = foods.where((food) => food.calories > 0).toList();
+    final sourceFoods = validFoods.isNotEmpty ? validFoods : _webPreviewFoods;
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final plans = <_DailyDietPlan>[];
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      final seed = (year * 1300) + (month * 50) + day;
+      final breakfast = _pickFood(sourceFoods, seed);
+      final lunch = _pickFood(sourceFoods, seed + 7, fallback: breakfast);
+      final snack = _pickFood(sourceFoods, seed + 13, fallback: lunch);
+      final dinner = _pickFood(sourceFoods, seed + 19, fallback: breakfast);
+
+      final items = <_PlannedMealItem>[
+        _PlannedMealItem(mealKey: 'breakfast', food: breakfast, grams: 140),
+        _PlannedMealItem(mealKey: 'lunch', food: lunch, grams: 180),
+        _PlannedMealItem(mealKey: 'snack', food: snack, grams: 80),
+        _PlannedMealItem(mealKey: 'dinner', food: dinner, grams: 180),
+      ];
+
+      final totals = _computePlanTotals(items);
+      plans.add(
+        _DailyDietPlan(
+          date: DateTime(year, month, day),
+          items: items,
+          totals: totals,
+        ),
+      );
+    }
+
+    return _MonthlyDietPlan(
+      year: year,
+      month: month,
+      targetCalories: calorieTarget,
+      targetProtein: proteinTarget,
+      targetCarbs: carbsTarget,
+      targetFat: fatTarget,
+      days: plans,
+    );
+  }
+
+  _DailyDietPlan? _getDailyPlanForDate(DateTime date) {
+    final plan = _monthlyDietPlan;
+    if (plan == null) return null;
+    if (date.year != plan.year || date.month != plan.month) return null;
+
+    final dayIndex = date.day - 1;
+    if (dayIndex < 0 || dayIndex >= plan.days.length) return null;
+    return plan.days[dayIndex];
+  }
+
+  Future<void> _openPlannedRecipesForDay() async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const RecipeTodayScreen(),
+      ),
+    );
+    return;
+
+    final plan = _monthlyDietPlan;
+    if (plan == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'Primero genera una dieta en Planificador para ver recetas diarias.',
+              'Generate a diet in Planner first to view daily recipes.',
+            ),
+          ),
+        ),
+      );
+      await _openDietPlanner();
+      return;
+    }
+
+    final firstDate = DateTime(plan.year, plan.month, 1);
+    final lastDate = DateTime(plan.year, plan.month + 1, 0);
+    var selectedDate = DateTime.now();
+    if (selectedDate.isBefore(firstDate) || selectedDate.isAfter(lastDate)) {
+      selectedDate = firstDate;
+    }
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final dayPlan = _getDailyPlanForDate(selectedDate);
+
+            final items = dayPlan?.items ?? const <_PlannedMealItem>[];
+            final mealOrder = ['breakfast', 'lunch', 'snack', 'dinner'];
+
+            return AlertDialog(
+              title: Text(_t('Platos del día', 'Daily dishes')),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _t(
+                                'Día ${selectedDate.day} de ${_monthLabel(selectedDate.month)} ${selectedDate.year}',
+                                'Day ${selectedDate.day} of ${_monthLabel(selectedDate.month)} ${selectedDate.year}',
+                              ),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF325441),
+                              ),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: selectedDate,
+                                firstDate: firstDate,
+                                lastDate: lastDate,
+                              );
+                              if (picked == null) return;
+                              setDialogState(() => selectedDate = picked);
+                            },
+                            icon: const Icon(Icons.calendar_month_rounded),
+                            label: Text(_t('Cambiar', 'Change')),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: FilledButton.tonalIcon(
+                                onPressed: dayPlan == null
+                                    ? null
+                                    : () async {
+                                        Navigator.of(context).pop();
+                                        await _openDayCustomization(
+                                            selectedDate);
+                                      },
+                                icon: const Icon(Icons.tune_rounded),
+                                label: Text(
+                                    _t('Personalizar día', 'Customize day')),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (dayPlan != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '${dayPlan.totals.calories.toStringAsFixed(0)} kcal · '
+                          'P ${dayPlan.totals.protein.toStringAsFixed(0)}g · '
+                          'C ${dayPlan.totals.carbs.toStringAsFixed(0)}g · '
+                          'G ${dayPlan.totals.fat.toStringAsFixed(0)}g',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6A8D76),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...mealOrder.map((mealKey) {
+                          final mealItems = items
+                              .where((item) => item.mealKey == mealKey)
+                              .toList();
+                          if (mealItems.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          return Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FCF9),
+                              borderRadius: BorderRadius.circular(12),
+                              border:
+                                  Border.all(color: const Color(0xFFDDEBDD)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${_mealLabel(mealKey)} · ${_t('Platos', 'Dishes')} ${mealItems.length}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF2A4B38),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                ...mealItems.asMap().entries.map(
+                                  (entry) {
+                                    final dishIndex = entry.key + 1;
+                                    final item = entry.value;
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 3),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            item.food.emoji,
+                                            style:
+                                                const TextStyle(fontSize: 18),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${_t('Plato', 'Dish')} $dishIndex · ${item.food.name}',
+                                              style: const TextStyle(
+                                                color: Color(0xFF325441),
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${item.grams.toStringAsFixed(0)}g',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF2E8A5E),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ] else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            _t(
+                              'No hay receta planificada para esta fecha.',
+                              'There is no planned recipe for this date.',
+                            ),
+                            style: const TextStyle(color: Color(0xFF6A8D76)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(_t('Cerrar', 'Close')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openDietPlanner() async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const PlanificarHomeScreen(),
+      ),
+    );
+    return;
+
+    final now = DateTime.now();
+    final request = await showDialog<_PlannerRequest>(
+      context: context,
+      builder: (context) {
+        var selectedMonth = now.month;
+        var selectedYear = now.year;
+        var prioritizeQuickFoods = true;
+        var manualMode = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(_t('Generar dieta mensual', 'Generate monthly diet')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: selectedMonth,
+                            decoration: InputDecoration(
+                              labelText: _t('Mes', 'Month'),
+                            ),
+                            items: List.generate(12, (index) {
+                              final month = index + 1;
+                              return DropdownMenuItem<int>(
+                                value: month,
+                                child: Text(_monthLabel(month)),
+                              );
+                            }),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setDialogState(() => selectedMonth = value);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: selectedYear,
+                            decoration: InputDecoration(
+                              labelText: _t('Año', 'Year'),
+                            ),
+                            items: [
+                              now.year,
+                              now.year + 1,
+                            ]
+                                .map(
+                                  (year) => DropdownMenuItem<int>(
+                                    value: year,
+                                    child: Text('$year'),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setDialogState(() => selectedYear = value);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5FAF5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFDDEBDD)),
+                      ),
+                      child: Text(
+                        _t(
+                          'Las calorías, macros y micronutrientes se calculan automáticamente desde tu perfil. No necesitas ingresar números.',
+                          'Calories, macros, and micronutrients are calculated automatically from your profile. No manual numbers required.',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF466D54),
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: prioritizeQuickFoods,
+                      onChanged: (value) {
+                        setDialogState(() => prioritizeQuickFoods = value);
+                      },
+                      title: Text(
+                        _t('Priorizar comidas rápidas',
+                            'Prioritize quick meals'),
+                      ),
+                      subtitle: Text(
+                        _t(
+                          'Útil para planes más prácticos entre semana.',
+                          'Useful for practical weekday plans.',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SwitchListTile.adaptive(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: manualMode,
+                      onChanged: (value) {
+                        setDialogState(() => manualMode = value);
+                      },
+                      title: Text(
+                        _t('Modo manual asistido', 'Assisted manual mode'),
+                      ),
+                      subtitle: Text(
+                        _t(
+                          'Genera un borrador editable para personalizar plato por plato.',
+                          'Generates an editable draft so you can customize dish by dish.',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(_t('Cancelar', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(
+                      _PlannerRequest(
+                        year: selectedYear,
+                        month: selectedMonth,
+                        prioritizeQuickFoods: prioritizeQuickFoods,
+                        manualMode: manualMode,
+                      ),
+                    );
+                  },
+                  child: Text(_t('Generar', 'Generate')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (request == null) return;
+
+    final foodsFromDb = await _repo.getAllFoods();
+    final prioritizedFoods = request.prioritizeQuickFoods
+        ? [
+            ...foodsFromDb.where((food) => food.isQuickFood),
+            ...foodsFromDb.where((food) => !food.isQuickFood),
+          ]
+        : foodsFromDb;
+
+    final sourceFoods = prioritizedFoods.isNotEmpty
+        ? prioritizedFoods
+        : (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods);
+
+    final plan = request.manualMode
+        ? _generateManualMonthlyPlan(
+            year: request.year,
+            month: request.month,
+            foods: sourceFoods,
+            calorieTarget: _targetCalories,
+            proteinTarget: _targetProtein,
+            carbsTarget: _targetCarbs,
+            fatTarget: _targetFat,
+          )
+        : _generateMonthlyDietPlan(
+            year: request.year,
+            month: request.month,
+            foods: sourceFoods,
+            calorieTarget: _targetCalories,
+            proteinTarget: _targetProtein,
+            carbsTarget: _targetCarbs,
+            fatTarget: _targetFat,
+          );
+
+    final evaluation = _evaluateMonthlyPlan(plan);
+    final planIsValid = evaluation.$1;
+    final suggestionsByDay = evaluation.$2;
+
+    if (!mounted) return;
+    setState(() {
+      _monthlyDietPlan = plan;
+      _monthlyPlanIsValid = planIsValid;
+      _planSuggestionsByDay = suggestionsByDay;
+    });
+
+    await _saveMonthlyPlanToStorage(plan);
+
+    if (!planIsValid) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text(_t('Plan generado con ajustes',
+                'Plan generated with adjustments')),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _t(
+                        request.manualMode
+                            ? 'Se generó tu borrador manual. Personaliza platos por día y guarda solo cuando cada día cumpla objetivos.'
+                            : 'Se generó el plan mensual automáticamente. Algunos días tienen recomendaciones para mejorar el balance nutricional.',
+                        request.manualMode
+                            ? 'Your manual draft was generated. Customize dishes by day and save only when each day meets targets.'
+                            : 'Your monthly plan was generated automatically. Some days include recommendations to improve nutritional balance.',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ...suggestionsByDay.entries.take(6).map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              _t(
+                                'Día ${entry.key}: ${entry.value.first}',
+                                'Day ${entry.key}: ${entry.value.first}',
+                              ),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF5A3A2B),
+                              ),
+                            ),
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(_t('Continuar', 'Continue')),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'Plan mensual generado para ${_monthLabel(plan.month)} ${plan.year}.',
+              'Monthly plan generated for ${_monthLabel(plan.month)} ${plan.year}.',
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (request.manualMode) {
+      await _openPlannedRecipesForDay();
+      return;
+    }
+
+    _showMonthlyPlanDetails();
+  }
+
+  void _showMonthlyPlanDetails() {
+    final plan = _monthlyDietPlan;
+    if (plan == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.86,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF8FFF8),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 46,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFBED8C5),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _t(
+                          'Dieta de ${_monthLabel(plan.month)} ${plan.year}',
+                          'Diet for ${_monthLabel(plan.month)} ${plan.year}',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF244B35),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  itemCount: plan.days.length,
+                  itemBuilder: (context, index) {
+                    final dayPlan = plan.days[index];
+                    return Container(
+                      margin: const EdgeInsets.only(top: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFDCEBDD)),
+                      ),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          dividerColor: Colors.transparent,
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 4,
+                          ),
+                          childrenPadding: const EdgeInsets.fromLTRB(
+                            14,
+                            0,
+                            14,
+                            14,
+                          ),
+                          title: Text(
+                            _t(
+                              'Día ${dayPlan.date.day}',
+                              'Day ${dayPlan.date.day}',
+                            ),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF2A4B38),
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${dayPlan.totals.calories.toStringAsFixed(0)} kcal · '
+                            'P ${dayPlan.totals.protein.toStringAsFixed(0)}g · '
+                            'C ${dayPlan.totals.carbs.toStringAsFixed(0)}g · '
+                            'G ${dayPlan.totals.fat.toStringAsFixed(0)}g',
+                            style: const TextStyle(
+                              color: Color(0xFF6A8D76),
+                              fontSize: 12,
+                            ),
+                          ),
+                          children: dayPlan.items
+                              .map(
+                                (item) => Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        item.food.emoji,
+                                        style: const TextStyle(fontSize: 18),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${_mealLabel(item.mealKey)} · ${item.food.name}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF325441),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        '${item.grams.toStringAsFixed(0)}g',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF2E8A5E),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -805,7 +2703,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         value: notificationsEnabled,
                         onChanged: (value) {
                           setModalState(() => notificationsEnabled = value);
-                          setState(() => _notificationsEnabled = value);
+                          unawaited(_setNotificationsEnabled(value));
                         },
                       ),
                       const SizedBox(height: 4),
@@ -1034,6 +2932,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _showComingSoon(String name) {
+    final normalized = name.toLowerCase();
+
+    if (normalized.contains('planificador') || normalized.contains('planner')) {
+      unawaited(_openDietPlanner());
+      return;
+    }
+
+    if (normalized.contains('recetas') || normalized.contains('recipes')) {
+      unawaited(_openPlannedRecipesForDay());
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -1478,6 +3388,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     height: 1.1,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF5D8),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: const Color(0xFFBFD6A6)),
+                  ),
+                  child: Text(
+                    'Build $_buildStamp',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF4F6B2E),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 14),
                 _buildSearchCard(),
                 const SizedBox(height: 16),
@@ -1488,7 +3417,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         icon: Icons.menu_book_rounded,
                         label: _t('Recetas', 'Recipes'),
                         background: const Color(0xFFF3AF2C),
-                        onTap: () => _showComingSoon(_t('Recetas', 'Recipes')),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const RecipeTodayScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1497,8 +3432,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         icon: Icons.calendar_month_rounded,
                         label: _t('Planificador', 'Planner'),
                         background: const Color(0xFFE96C79),
-                        onTap: () =>
-                            _showComingSoon(_t('Planificador', 'Planner')),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const PlanificarHomeScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1513,6 +3453,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ],
                 ),
+                const SizedBox(height: 14),
+                _buildDietPlannerSummaryCard(),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -2136,6 +4078,178 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDietPlannerSummaryCard() {
+    final plan = _monthlyDietPlan;
+    final avg = plan?.averageTotals;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE5D7D0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF2F4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: Color(0xFFE96C79),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _t(
+                    'Planificador de dieta mensual',
+                    'Monthly diet planner',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF4F362C),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            plan == null
+                ? _t(
+                    'Modo híbrido: el sistema genera el mes automáticamente y luego puedes personalizar platos por día sin tocar números.',
+                    'Hybrid mode: the system auto-generates the month and you can personalize dishes by day without touching numbers.',
+                  )
+                : _t(
+                    _monthlyPlanIsValid
+                        ? 'Plan activo y validado: ${_monthLabel(plan.month)} ${plan.year} (${plan.dayCount} días).'
+                        : 'Plan activo con ajustes pendientes: ${_monthLabel(plan.month)} ${plan.year}. Los días no válidos no se guardan al editar.',
+                    _monthlyPlanIsValid
+                        ? 'Active and validated plan: ${_monthLabel(plan.month)} ${plan.year} (${plan.dayCount} days).'
+                        : 'Active plan with pending adjustments: ${_monthLabel(plan.month)} ${plan.year}. Invalid days cannot be saved while editing.',
+                  ),
+            style: const TextStyle(
+              color: Color(0xFF7C6355),
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+          if (plan != null &&
+              !_monthlyPlanIsValid &&
+              _planSuggestionsByDay.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7EB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF5D7A3)),
+              ),
+              child: Text(
+                _t(
+                  'Días con sugerencias: ${_planSuggestionsByDay.keys.take(5).join(', ')}',
+                  'Days with suggestions: ${_planSuggestionsByDay.keys.take(5).join(', ')}',
+                ),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF7A5A2E),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+          if (plan != null && avg != null) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildMiniMacroTag(
+                  'kcal',
+                  '${avg.calories.toStringAsFixed(0)} / ${plan.targetCalories.toStringAsFixed(0)}',
+                ),
+                _buildMiniMacroTag(
+                  _t('Prot', 'Prot'),
+                  '${avg.protein.toStringAsFixed(0)} / ${plan.targetProtein.toStringAsFixed(0)}g',
+                ),
+                _buildMiniMacroTag(
+                  _t('Carb', 'Carb'),
+                  '${avg.carbs.toStringAsFixed(0)} / ${plan.targetCarbs.toStringAsFixed(0)}g',
+                ),
+                _buildMiniMacroTag(
+                  _t('Grasa', 'Fat'),
+                  '${avg.fat.toStringAsFixed(0)} / ${plan.targetFat.toStringAsFixed(0)}g',
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: _openDietPlanner,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0x1AE96C79),
+                    foregroundColor: const Color(0xFFC64B62),
+                  ),
+                  child: Text(_t('Generar plan', 'Generate plan')),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: plan == null ? null : _showMonthlyPlanDetails,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E8A5E),
+                  ),
+                  child: Text(_t('Ver mes completo', 'View full month')),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniMacroTag(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FCF8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFDDEBDD)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF466D54),
         ),
       ),
     );

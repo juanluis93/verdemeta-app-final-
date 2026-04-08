@@ -28,6 +28,7 @@ enum _AuthMode { login, register }
 
 class _LoginScreenState extends State<LoginScreen> {
   static const _sessionUserIdKey = 'session_user_id';
+  static const _loginBuildStamp = 'MANUAL-D-20260405';
 
   final FoodRepository _repo = FoodRepository();
   final _usernameCtrl = TextEditingController();
@@ -343,7 +344,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ? await _repo.registerUser(username: username, password: password)
           : await _repo.loginUser(username: username, password: password);
 
-        await _persistSession(account.id);
+      await _persistSession(account.id);
 
       final scopedRepo = _repo.forUser(account);
       final hasProfile = await scopedRepo.hasUserProfile();
@@ -494,6 +495,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: headingColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF7EE),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(color: const Color(0xFFB8DABA)),
+                      ),
+                      child: Text(
+                        'Build $_loginBuildStamp',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2E8A5E),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),

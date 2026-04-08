@@ -95,6 +95,8 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   String _goal = 'health';
   double _activity = 1.55;
   bool _saving = false;
+  List<HealthCondition> _availableConditions = const [];
+  Set<int> _selectedConditionIds = <int>{};
 
   String _safeGender(String value) {
     return _genderOptions.contains(value) ? value : 'female';
@@ -139,6 +141,17 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
 
   Future<void> _loadProfile() async {
     try {
+      final conditions = await widget.repository.getHealthConditions();
+      if (mounted) {
+        setState(() {
+          _availableConditions = conditions;
+        });
+      }
+    } catch (_) {
+      // Keep the form usable even if conditions fail to load.
+    }
+
+    try {
       final profile = await widget.repository.getUserProfile();
       if (!mounted || profile == null) return;
 
@@ -156,10 +169,105 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
         _gender = _safeGender(profile.gender);
         _goal = _safeGoal(profile.goal);
         _activity = _safeActivity(profile.activityLevel);
+        _selectedConditionIds = profile.diseaseIds.toSet();
       });
     } catch (_) {
       // If profile fails to load (for example on web preview), the form remains editable.
     }
+  }
+
+  Future<void> _pickConditions() async {
+    if (_availableConditions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay enfermedades disponibles en la base de datos.'),
+        ),
+      );
+      return;
+    }
+
+    final tempSelection = Set<int>.from(_selectedConditionIds);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFF9FCF8),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setLocalState) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Selecciona enfermedades',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2F7F53),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _availableConditions.length,
+                        itemBuilder: (context, index) {
+                          final condition = _availableConditions[index];
+                          final selected = tempSelection.contains(condition.id);
+                          return CheckboxListTile(
+                            dense: true,
+                            value: selected,
+                            activeColor: const Color(0xFF2e7d52),
+                            title: Text(condition.nombre),
+                            subtitle: Text(
+                              condition.descripcion,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onChanged: (value) {
+                              setLocalState(() {
+                                if (value == true) {
+                                  tempSelection.add(condition.id);
+                                } else {
+                                  tempSelection.remove(condition.id);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedConditionIds = tempSelection;
+                          });
+                          Navigator.of(sheetContext).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2e7d52),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Aplicar selección'),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   double? _parseOptional(String text) {
@@ -485,6 +593,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     required double activity,
     required String goal,
     double? leanBodyMass,
+    List<HealthCondition> conditions = const [],
   }) {
     final safeWeight = weight.clamp(35.0, 300.0).toDouble();
     final safeHeight =
@@ -568,6 +677,51 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
 
     calorie = (protein * 4) + (fat * 9) + (carbs * 4);
 
+    if (conditions.isNotEmpty) {
+      final calorieAdjPct = conditions
+          .fold<double>(0, (acc, c) => acc + c.ajusteCalorias)
+          .clamp(-35.0, 25.0);
+      final proteinAdjPct = conditions
+          .fold<double>(0, (acc, c) => acc + c.ajusteProteinas)
+          .clamp(-30.0, 30.0);
+      final carbsAdjPct = conditions
+          .fold<double>(0, (acc, c) => acc + c.ajusteCarbohidratos)
+          .clamp(-35.0, 35.0);
+      final fatAdjPct = conditions
+          .fold<double>(0, (acc, c) => acc + c.ajusteGrasas)
+          .clamp(-30.0, 30.0);
+
+      final adjustedCalories =
+          (calorie * (1 + (calorieAdjPct / 100))).clamp(minCalorie, maxCalorie);
+
+      final adjustedProtein = protein * (1 + (proteinAdjPct / 100));
+      final adjustedCarbs = carbs * (1 + (carbsAdjPct / 100));
+      final adjustedFat = fat * (1 + (fatAdjPct / 100));
+
+      final macroKcalProtein = adjustedProtein * 4;
+      final macroKcalCarbs = adjustedCarbs * 4;
+      final macroKcalFat = adjustedFat * 9;
+      final macroKcalTotal = macroKcalProtein + macroKcalCarbs + macroKcalFat;
+
+      if (macroKcalTotal > 0) {
+        var proteinPct = (macroKcalProtein / macroKcalTotal).clamp(0.18, 0.45);
+        var carbsPct = (macroKcalCarbs / macroKcalTotal).clamp(0.15, 0.60);
+        var fatPctAdjusted = (macroKcalFat / macroKcalTotal).clamp(0.20, 0.45);
+
+        final pctSum = proteinPct + carbsPct + fatPctAdjusted;
+        proteinPct /= pctSum;
+        carbsPct /= pctSum;
+        fatPctAdjusted /= pctSum;
+
+        protein = (adjustedCalories * proteinPct) / 4;
+        carbs = (adjustedCalories * carbsPct) / 4;
+        fat = (adjustedCalories * fatPctAdjusted) / 9;
+        calorie = adjustedCalories.toDouble();
+      }
+    }
+
+    calorie = (protein * 4) + (fat * 9) + (carbs * 4);
+
     return (
       calorie: _round1(calorie),
       protein: _round1(protein),
@@ -636,6 +790,9 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
         activity: _activity,
         goal: _goal,
         leanBodyMass: bodyComp?.leanBodyMass,
+        conditions: _availableConditions
+            .where((c) => _selectedConditionIds.contains(c.id))
+            .toList(),
       );
 
       final profile = UserProfile(
@@ -646,6 +803,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
         height: height,
         activityLevel: _activity,
         goal: _goal,
+        diseaseIds: _selectedConditionIds.toList()..sort(),
         waist: waist,
         neck: neck,
         hip: hip,
@@ -982,8 +1140,15 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
             activity: _activity,
             goal: _goal,
             leanBodyMass: previewBodyComp?.leanBodyMass,
+            conditions: _availableConditions
+                .where((c) => _selectedConditionIds.contains(c.id))
+                .toList(),
           )
         : null;
+
+    final selectedConditions = _availableConditions
+        .where((c) => _selectedConditionIds.contains(c.id))
+        .toList();
 
     return PopScope(
       canPop: !_saving,
@@ -1293,6 +1458,66 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                               ],
                               onChanged: (v) =>
                                   _activity = _safeActivity(v ?? 1.55),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'ENFERMEDADES',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1,
+                                      color: Color(0xFF5C846D),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  InkWell(
+                                    onTap: _pickConditions,
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: InputDecorator(
+                                      decoration: _mobileInputDecoration(),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              selectedConditions.isEmpty
+                                                  ? 'Seleccionar enfermedades'
+                                                  : '${selectedConditions.length} seleccionada(s)',
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                color: Color(0xFF345646),
+                                              ),
+                                            ),
+                                          ),
+                                          const Icon(
+                                            Icons.keyboard_arrow_down,
+                                            color: Color(0xFF5C846D),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (selectedConditions.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: selectedConditions
+                                          .map(
+                                            (c) => Chip(
+                                              label: Text(c.nombre),
+                                              backgroundColor:
+                                                  const Color(0x142E7D52),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                             if (previewTargets != null ||
                                 previewBodyComp != null) ...[
