@@ -52,7 +52,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -108,6 +108,20 @@ class DatabaseHelper {
 
     if (oldVersion < 4) {
       await _createProfileRecordsTable(db);
+    }
+
+    if (oldVersion < 5) {
+      await _seedInitialData(db);
+    }
+
+    if (oldVersion < 6) {
+      await _createHealthConditionTables(db);
+      if (!await _columnExists(db, 'user_profiles', 'selected_disease_ids')) {
+        await db.execute(
+          "ALTER TABLE user_profiles ADD COLUMN selected_disease_ids TEXT NOT NULL DEFAULT '[]'",
+        );
+      }
+      await _seedHealthConditions(db);
     }
   }
 
@@ -290,6 +304,7 @@ class DatabaseHelper {
         height REAL NOT NULL,
         activity_level REAL NOT NULL DEFAULT 1.55,
         goal TEXT NOT NULL CHECK (goal IN ('deficit', 'maintain', 'gain', 'health')),
+        selected_disease_ids TEXT NOT NULL DEFAULT '[]',
         
         waist REAL,
         neck REAL,
@@ -394,10 +409,26 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> _createHealthConditionTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS enfermedades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL UNIQUE,
+        descripcion TEXT NOT NULL,
+        ajuste_calorias REAL NOT NULL DEFAULT 0,
+        ajuste_proteinas REAL NOT NULL DEFAULT 0,
+        ajuste_carbohidratos REAL NOT NULL DEFAULT 0,
+        ajuste_grasas REAL NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
   /// Inserta datos iniciales desde el archivo SQL
   Future<void> _seedInitialData(Database db) async {
-    // Quick foods (12 alimentos frecuentes)
-    final quickFoods = [
+    await _createHealthConditionTables(db);
+
+    // Catalogo base para planner y registro (se mantiene idempotente con UNIQUE(name)).
+    final seedFoods = [
       {
         'name': 'Tofu firme',
         'emoji': '🧊',
@@ -410,7 +441,8 @@ class DatabaseHelper {
         'iron': 1.3,
         'calcium': 200,
         'b12': 0,
-        'zinc': 0.8
+        'zinc': 0.8,
+        'quick': 1,
       },
       {
         'name': 'Lentejas cocidas',
@@ -424,7 +456,8 @@ class DatabaseHelper {
         'iron': 3.3,
         'calcium': 19,
         'b12': 0,
-        'zinc': 1.3
+        'zinc': 1.3,
+        'quick': 1,
       },
       {
         'name': 'Garbanzos',
@@ -438,7 +471,8 @@ class DatabaseHelper {
         'iron': 2.9,
         'calcium': 49,
         'b12': 0,
-        'zinc': 1.5
+        'zinc': 1.5,
+        'quick': 1,
       },
       {
         'name': 'Quinoa cocida',
@@ -452,7 +486,8 @@ class DatabaseHelper {
         'iron': 1.5,
         'calcium': 17,
         'b12': 0,
-        'zinc': 1.1
+        'zinc': 1.1,
+        'quick': 1,
       },
       {
         'name': 'Espinaca',
@@ -466,7 +501,8 @@ class DatabaseHelper {
         'iron': 2.7,
         'calcium': 99,
         'b12': 0,
-        'zinc': 0.5
+        'zinc': 0.5,
+        'quick': 1,
       },
       {
         'name': 'Aguacate',
@@ -480,7 +516,8 @@ class DatabaseHelper {
         'iron': 0.6,
         'calcium': 12,
         'b12': 0,
-        'zinc': 0.6
+        'zinc': 0.6,
+        'quick': 1,
       },
       {
         'name': 'Plátano',
@@ -494,7 +531,8 @@ class DatabaseHelper {
         'iron': 0.3,
         'calcium': 5,
         'b12': 0,
-        'zinc': 0.2
+        'zinc': 0.2,
+        'quick': 1,
       },
       {
         'name': 'Leche de soja',
@@ -508,7 +546,8 @@ class DatabaseHelper {
         'iron': 0.4,
         'calcium': 120,
         'b12': 1.2,
-        'zinc': 0.3
+        'zinc': 0.3,
+        'quick': 1,
       },
       {
         'name': 'Nueces',
@@ -522,7 +561,8 @@ class DatabaseHelper {
         'iron': 2.9,
         'calcium': 98,
         'b12': 0,
-        'zinc': 3.1
+        'zinc': 3.1,
+        'quick': 1,
       },
       {
         'name': 'Brócoli',
@@ -536,7 +576,8 @@ class DatabaseHelper {
         'iron': 0.7,
         'calcium': 47,
         'b12': 0,
-        'zinc': 0.4
+        'zinc': 0.4,
+        'quick': 1,
       },
       {
         'name': 'Arroz integral',
@@ -550,7 +591,8 @@ class DatabaseHelper {
         'iron': 1.1,
         'calcium': 20,
         'b12': 0,
-        'zinc': 1.2
+        'zinc': 1.2,
+        'quick': 1,
       },
       {
         'name': 'Tempeh',
@@ -564,31 +606,476 @@ class DatabaseHelper {
         'iron': 2.7,
         'calcium': 184,
         'b12': 0,
-        'zinc': 1.7
+        'zinc': 1.7,
+        'quick': 1,
+      },
+      {
+        'name': 'Avena',
+        'emoji': '🥣',
+        'cal': 389,
+        'prot': 17,
+        'carb': 66,
+        'fat': 7,
+        'fiber': 10,
+        'sugar': 1,
+        'iron': 4.7,
+        'calcium': 54,
+        'b12': 0,
+        'zinc': 4,
+        'quick': 0,
+      },
+      {
+        'name': 'Frijoles negros',
+        'emoji': '🫘',
+        'cal': 132,
+        'prot': 8.9,
+        'carb': 24,
+        'fat': 0.5,
+        'fiber': 8.7,
+        'sugar': 0.3,
+        'iron': 2.1,
+        'calcium': 27,
+        'b12': 0,
+        'zinc': 1,
+        'quick': 0,
+      },
+      {
+        'name': 'Edamame',
+        'emoji': '💚',
+        'cal': 121,
+        'prot': 11.9,
+        'carb': 8.9,
+        'fat': 5.2,
+        'fiber': 5,
+        'sugar': 2.2,
+        'iron': 2.3,
+        'calcium': 63,
+        'b12': 0,
+        'zinc': 1.4,
+        'quick': 0,
+      },
+      {
+        'name': 'Almendras',
+        'emoji': '🌰',
+        'cal': 579,
+        'prot': 21,
+        'carb': 22,
+        'fat': 49,
+        'fiber': 12.5,
+        'sugar': 4.4,
+        'iron': 3.7,
+        'calcium': 264,
+        'b12': 0,
+        'zinc': 3.1,
+        'quick': 0,
+      },
+      {
+        'name': 'Manzana',
+        'emoji': '🍎',
+        'cal': 52,
+        'prot': 0.3,
+        'carb': 14,
+        'fat': 0.2,
+        'fiber': 2.4,
+        'sugar': 10,
+        'iron': 0.1,
+        'calcium': 6,
+        'b12': 0,
+        'zinc': 0.04,
+        'quick': 0,
+      },
+      {
+        'name': 'Naranja',
+        'emoji': '🍊',
+        'cal': 47,
+        'prot': 0.9,
+        'carb': 12,
+        'fat': 0.1,
+        'fiber': 2.4,
+        'sugar': 9,
+        'iron': 0.1,
+        'calcium': 40,
+        'b12': 0,
+        'zinc': 0.1,
+        'quick': 0,
+      },
+      {
+        'name': 'Zanahoria',
+        'emoji': '🥕',
+        'cal': 41,
+        'prot': 0.9,
+        'carb': 10,
+        'fat': 0.2,
+        'fiber': 2.8,
+        'sugar': 4.7,
+        'iron': 0.3,
+        'calcium': 33,
+        'b12': 0,
+        'zinc': 0.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Tomate',
+        'emoji': '🍅',
+        'cal': 18,
+        'prot': 0.9,
+        'carb': 3.9,
+        'fat': 0.2,
+        'fiber': 1.2,
+        'sugar': 2.6,
+        'iron': 0.3,
+        'calcium': 10,
+        'b12': 0,
+        'zinc': 0.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Lechuga',
+        'emoji': '🥗',
+        'cal': 15,
+        'prot': 1.4,
+        'carb': 2.9,
+        'fat': 0.2,
+        'fiber': 1.3,
+        'sugar': 1,
+        'iron': 0.9,
+        'calcium': 36,
+        'b12': 0,
+        'zinc': 0.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Pepino',
+        'emoji': '🥒',
+        'cal': 16,
+        'prot': 0.7,
+        'carb': 3.6,
+        'fat': 0.1,
+        'fiber': 0.5,
+        'sugar': 1.7,
+        'iron': 0.3,
+        'calcium': 16,
+        'b12': 0,
+        'zinc': 0.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Papa',
+        'emoji': '🥔',
+        'cal': 77,
+        'prot': 2,
+        'carb': 17,
+        'fat': 0.1,
+        'fiber': 2.2,
+        'sugar': 0.8,
+        'iron': 0.8,
+        'calcium': 12,
+        'b12': 0,
+        'zinc': 0.3,
+        'quick': 0,
+      },
+      {
+        'name': 'Camote',
+        'emoji': '🍠',
+        'cal': 86,
+        'prot': 1.6,
+        'carb': 20,
+        'fat': 0.1,
+        'fiber': 3,
+        'sugar': 4.2,
+        'iron': 0.6,
+        'calcium': 30,
+        'b12': 0,
+        'zinc': 0.3,
+        'quick': 0,
+      },
+      {
+        'name': 'Apio',
+        'emoji': '🥬',
+        'cal': 16,
+        'prot': 0.7,
+        'carb': 3,
+        'fat': 0.2,
+        'fiber': 1.6,
+        'sugar': 1.3,
+        'iron': 0.2,
+        'calcium': 40,
+        'b12': 0,
+        'zinc': 0.1,
+        'quick': 0,
+      },
+      {
+        'name': 'Col rizada',
+        'emoji': '🥬',
+        'cal': 49,
+        'prot': 4.3,
+        'carb': 8.8,
+        'fat': 0.9,
+        'fiber': 3.6,
+        'sugar': 2.3,
+        'iron': 1.5,
+        'calcium': 150,
+        'b12': 0,
+        'zinc': 0.4,
+        'quick': 0,
+      },
+      {
+        'name': 'Repollo',
+        'emoji': '🥬',
+        'cal': 25,
+        'prot': 1.3,
+        'carb': 6,
+        'fat': 0.1,
+        'fiber': 2.5,
+        'sugar': 3.2,
+        'iron': 0.5,
+        'calcium': 40,
+        'b12': 0,
+        'zinc': 0.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Berenjena',
+        'emoji': '🍆',
+        'cal': 25,
+        'prot': 1,
+        'carb': 6,
+        'fat': 0.2,
+        'fiber': 3,
+        'sugar': 3.5,
+        'iron': 0.2,
+        'calcium': 9,
+        'b12': 0,
+        'zinc': 0.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Pimientos',
+        'emoji': '🫑',
+        'cal': 31,
+        'prot': 1,
+        'carb': 6,
+        'fat': 0.3,
+        'fiber': 2.1,
+        'sugar': 4.2,
+        'iron': 0.4,
+        'calcium': 7,
+        'b12': 0,
+        'zinc': 0.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Champiñones',
+        'emoji': '🍄',
+        'cal': 22,
+        'prot': 3.1,
+        'carb': 3.3,
+        'fat': 0.3,
+        'fiber': 1,
+        'sugar': 2,
+        'iron': 0.5,
+        'calcium': 3,
+        'b12': 0,
+        'zinc': 0.5,
+        'quick': 0,
+      },
+      {
+        'name': 'Maíz',
+        'emoji': '🌽',
+        'cal': 96,
+        'prot': 3.4,
+        'carb': 21,
+        'fat': 1.5,
+        'fiber': 2.4,
+        'sugar': 4.5,
+        'iron': 0.5,
+        'calcium': 2,
+        'b12': 0,
+        'zinc': 0.5,
+        'quick': 0,
+      },
+      {
+        'name': 'Arvejas',
+        'emoji': '🫛',
+        'cal': 81,
+        'prot': 5.4,
+        'carb': 14,
+        'fat': 0.4,
+        'fiber': 5.1,
+        'sugar': 5.6,
+        'iron': 1.5,
+        'calcium': 25,
+        'b12': 0,
+        'zinc': 1.2,
+        'quick': 0,
+      },
+      {
+        'name': 'Fresa',
+        'emoji': '🍓',
+        'cal': 32,
+        'prot': 0.7,
+        'carb': 7.7,
+        'fat': 0.3,
+        'fiber': 2,
+        'sugar': 4.9,
+        'iron': 0.4,
+        'calcium': 16,
+        'b12': 0,
+        'zinc': 0.1,
+        'quick': 0,
+      },
+      {
+        'name': 'Mango',
+        'emoji': '🥭',
+        'cal': 60,
+        'prot': 0.8,
+        'carb': 15,
+        'fat': 0.4,
+        'fiber': 1.6,
+        'sugar': 13.7,
+        'iron': 0.2,
+        'calcium': 11,
+        'b12': 0,
+        'zinc': 0.1,
+        'quick': 0,
+      },
+      {
+        'name': 'Piña',
+        'emoji': '🍍',
+        'cal': 50,
+        'prot': 0.5,
+        'carb': 13,
+        'fat': 0.1,
+        'fiber': 1.4,
+        'sugar': 9.9,
+        'iron': 0.3,
+        'calcium': 13,
+        'b12': 0,
+        'zinc': 0.1,
+        'quick': 0,
+      },
+      {
+        'name': 'Arroz blanco',
+        'emoji': '🍚',
+        'cal': 130,
+        'prot': 2.7,
+        'carb': 28,
+        'fat': 0.3,
+        'fiber': 0.4,
+        'sugar': 0,
+        'iron': 0.2,
+        'calcium': 10,
+        'b12': 0,
+        'zinc': 0.5,
+        'quick': 0,
       },
     ];
 
-    for (var food in quickFoods) {
-      await db.insert('foods', {
-        'name': food['name'],
-        'emoji': food['emoji'],
-        'calories': food['cal'],
-        'protein': food['prot'],
-        'carbs': food['carb'],
-        'fat': food['fat'],
-        'fiber': food['fiber'],
-        'sugar': food['sugar'],
-        'iron': food['iron'],
-        'calcium': food['calcium'],
-        'b12': food['b12'],
-        'zinc': food['zinc'],
-        'is_quick_food': 1,
-      });
+    for (var food in seedFoods) {
+      await db.insert(
+          'foods',
+          {
+            'name': food['name'],
+            'emoji': food['emoji'],
+            'calories': food['cal'],
+            'protein': food['prot'],
+            'carbs': food['carb'],
+            'fat': food['fat'],
+            'fiber': food['fiber'],
+            'sugar': food['sugar'],
+            'iron': food['iron'],
+            'calcium': food['calcium'],
+            'b12': food['b12'],
+            'zinc': food['zinc'],
+            'is_quick_food': food['quick'],
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
+    final aliasPairs = {
+      'Aguacate': ['palta', 'avocado'],
+      'Arroz integral': ['arroz moreno'],
+      'Arroz blanco': ['arroz'],
+      'Brócoli': ['brocoli'],
+      'Leche de soja': ['leche soya', 'bebida soja'],
+      'Frijoles negros': ['caraotas', 'judias negras'],
+      'Plátano': ['banana', 'cambur'],
+      'Champiñones': ['hongos', 'setas'],
+    };
+
+    for (final entry in aliasPairs.entries) {
+      final rows = await db.query(
+        'foods',
+        columns: ['id'],
+        where: 'name = ?',
+        whereArgs: [entry.key],
+        limit: 1,
+      );
+      if (rows.isEmpty) continue;
+      final foodId = rows.first['id'] as int;
+
+      for (final alias in entry.value) {
+        await db.insert(
+          'food_aliases',
+          {'food_id': foodId, 'alias': alias},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    }
+
+    await _seedHealthConditions(db);
+
     print(
-        '✅ Base de datos inicializada con ${quickFoods.length} alimentos quick');
-    // NOTA: Para más alimentos, puedes ejecutar el archivo seed_data.sql
+        '✅ Catálogo SQL inicializado/actualizado con ${seedFoods.length} alimentos base');
+  }
+
+  Future<void> _seedHealthConditions(Database db) async {
+    final seedConditions = [
+      {
+        'nombre': 'Diabetes',
+        'descripcion':
+            'Reduce carbohidratos de absorcion rapida y sube ligeramente proteinas.',
+        'ajuste_calorias': -5.0,
+        'ajuste_proteinas': 10.0,
+        'ajuste_carbohidratos': -20.0,
+        'ajuste_grasas': 5.0,
+      },
+      {
+        'nombre': 'Hipertension',
+        'descripcion':
+            'Ligera reduccion calorica y prioridad a alimentos bajos en sodio.',
+        'ajuste_calorias': -8.0,
+        'ajuste_proteinas': 5.0,
+        'ajuste_carbohidratos': -5.0,
+        'ajuste_grasas': 0.0,
+      },
+      {
+        'nombre': 'Obesidad',
+        'descripcion':
+            'Reduccion moderada de calorias totales para perdida gradual.',
+        'ajuste_calorias': -15.0,
+        'ajuste_proteinas': 8.0,
+        'ajuste_carbohidratos': -10.0,
+        'ajuste_grasas': -5.0,
+      },
+      {
+        'nombre': 'Insuficiencia renal',
+        'descripcion':
+            'Control de carga proteica y energia estable segun tolerancia clinica.',
+        'ajuste_calorias': -5.0,
+        'ajuste_proteinas': -20.0,
+        'ajuste_carbohidratos': 5.0,
+        'ajuste_grasas': 5.0,
+      },
+    ];
+
+    for (final condition in seedConditions) {
+      await db.insert(
+        'enfermedades',
+        condition,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
   }
 
   /// Cierra la base de datos

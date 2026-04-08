@@ -5,9 +5,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'database/database_helper.dart';
+import 'presentation/screens/planificar_home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/daily_macro_notification_service.dart';
 
@@ -15,7 +17,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DatabaseHelper.initializeDatabaseFactory();
   await DailyMacroNotificationService.initialize();
-  runApp(const VerdeMeta());
+  runApp(const ProviderScope(child: VerdeMeta()));
 }
 
 class VerdeMeta extends StatefulWidget {
@@ -109,6 +111,9 @@ class _VerdeMetaState extends State<VerdeMeta> {
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
       themeMode: _themeMode,
+      routes: {
+        '/planner-v2': (_) => const PlanificarHomeScreen(),
+      },
       home: LoginScreen(
         locale: _locale,
         onLanguageChanged: _setLocale,

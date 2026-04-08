@@ -693,6 +693,30 @@ class FoodRepository {
     return UserProfile.fromMap(maps.first);
   }
 
+  Future<List<HealthCondition>> getHealthConditions() async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
+      'enfermedades',
+      orderBy: 'nombre COLLATE NOCASE ASC',
+    );
+
+    return maps.map(HealthCondition.fromMap).toList();
+  }
+
+  Future<List<HealthCondition>> getHealthConditionsByIds(
+      List<int> conditionIds) async {
+    if (conditionIds.isEmpty) return const [];
+
+    final db = await _dbHelper.database;
+    final placeholders = List.filled(conditionIds.length, '?').join(',');
+    final maps = await db.rawQuery(
+      'SELECT * FROM enfermedades WHERE id IN ($placeholders)',
+      conditionIds,
+    );
+
+    return maps.map(HealthCondition.fromMap).toList();
+  }
+
   Future<bool> hasUserProfile() async {
     final profile = await getUserProfile();
     return profile != null;

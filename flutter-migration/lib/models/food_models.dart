@@ -4,6 +4,41 @@
 /// ═══════════════════════════════════════════════════
 library;
 
+import 'dart:convert';
+
+class HealthCondition {
+  final int id;
+  final String nombre;
+  final String descripcion;
+  final double ajusteCalorias;
+  final double ajusteProteinas;
+  final double ajusteCarbohidratos;
+  final double ajusteGrasas;
+
+  const HealthCondition({
+    required this.id,
+    required this.nombre,
+    required this.descripcion,
+    required this.ajusteCalorias,
+    required this.ajusteProteinas,
+    required this.ajusteCarbohidratos,
+    required this.ajusteGrasas,
+  });
+
+  factory HealthCondition.fromMap(Map<String, dynamic> map) {
+    return HealthCondition(
+      id: map['id'] as int,
+      nombre: (map['nombre'] as String?) ?? '',
+      descripcion: (map['descripcion'] as String?) ?? '',
+      ajusteCalorias: (map['ajuste_calorias'] as num?)?.toDouble() ?? 0,
+      ajusteProteinas: (map['ajuste_proteinas'] as num?)?.toDouble() ?? 0,
+      ajusteCarbohidratos:
+          (map['ajuste_carbohidratos'] as num?)?.toDouble() ?? 0,
+      ajusteGrasas: (map['ajuste_grasas'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
 class Food {
   final int? id;
   final String name;
@@ -289,6 +324,7 @@ class UserProfile {
   final double height; // cm
   final double activityLevel; // 1.2 - 1.9
   final String goal; // 'deficit', 'maintain', 'gain', 'health'
+  final List<int> diseaseIds;
 
   // Medidas corporales
   final double? waist;
@@ -324,6 +360,7 @@ class UserProfile {
     required this.height,
     this.activityLevel = 1.55,
     required this.goal,
+    this.diseaseIds = const [],
     this.waist,
     this.neck,
     this.hip,
@@ -355,6 +392,7 @@ class UserProfile {
       height: (map['height'] as num).toDouble(),
       activityLevel: (map['activity_level'] as num?)?.toDouble() ?? 1.55,
       goal: map['goal'] as String,
+      diseaseIds: _parseDiseaseIds(map['selected_disease_ids']),
       waist: (map['waist'] as num?)?.toDouble(),
       neck: (map['neck'] as num?)?.toDouble(),
       hip: (map['hip'] as num?)?.toDouble(),
@@ -386,6 +424,7 @@ class UserProfile {
       'height': height,
       'activity_level': activityLevel,
       'goal': goal,
+      'selected_disease_ids': jsonEncode(diseaseIds),
       'waist': waist,
       'neck': neck,
       'hip': hip,
@@ -405,6 +444,27 @@ class UserProfile {
       'created_at': createdAt,
       'updated_at': updatedAt,
     };
+  }
+
+  static List<int> _parseDiseaseIds(dynamic raw) {
+    if (raw == null) return const [];
+
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return decoded
+              .map((e) => e is num ? e.toInt() : int.tryParse('$e'))
+              .whereType<int>()
+              .toSet()
+              .toList();
+        }
+      } catch (_) {
+        return const [];
+      }
+    }
+
+    return const [];
   }
 }
 
