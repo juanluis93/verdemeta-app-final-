@@ -206,6 +206,10 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final isDarkSheet = Theme.of(context).brightness == Brightness.dark;
+            const switchActiveTrack = Color(0xFF2E8A5E);
+            final switchInactiveTrack =
+                isDarkSheet ? const Color(0xFF6F7A74) : const Color(0xFFB9C4BE);
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -252,8 +256,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    SwitchListTile.adaptive(
+                    SwitchListTile(
                       contentPadding: EdgeInsets.zero,
+                      activeColor: Colors.white,
+                      activeTrackColor: switchActiveTrack,
+                      inactiveThumbColor: Colors.white,
+                      inactiveTrackColor: switchInactiveTrack,
                       title: Row(
                         children: [
                           Text(
@@ -432,10 +440,8 @@ class _LoginScreenState extends State<LoginScreen> {
         isDark ? const Color(0xFF24332C) : const Color(0xFFF4F8F3);
     final infoColor =
         isDark ? const Color(0xFF22352B) : const Color(0xFFF8FCF8);
-    final headingColor =
-        isDark ? const Color(0xFFD7F2DE) : const Color(0xFF214734);
-    final bodyColor =
-        isDark ? const Color(0xFFAFCFBB) : const Color(0xFF6A8D76);
+    final headingColor = isDark ? Colors.white : const Color(0xFF214734);
+    final bodyColor = isDark ? Colors.white : const Color(0xFF6A8D76);
 
     return Scaffold(
       backgroundColor: pageColor,
@@ -474,7 +480,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               scale: 1.6,
                               alignment: Alignment.centerLeft,
                               child: Image.asset(
-                                'assets/images/logo.jpeg',
+                                'assets/images/VerdeMeta - Iconografia.png',
                                 fit: BoxFit.cover,
                                 alignment: Alignment.centerLeft,
                               ),
@@ -504,16 +510,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEAF7EE),
+                        color: isDark
+                            ? const Color(0xFF2A3A31)
+                            : const Color(0xFFEAF7EE),
                         borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: const Color(0xFFB8DABA)),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF476756)
+                              : const Color(0xFFB8DABA),
+                        ),
                       ),
                       child: Text(
                         'Build $_loginBuildStamp',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF2E8A5E),
+                          color:
+                              isDark ? Colors.white : const Color(0xFF2E8A5E),
                         ),
                       ),
                     ),
@@ -657,9 +670,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: isDark
-                              ? const Color(0xFFAAC8B3)
-                              : const Color(0xFF5A7B65),
+                          color:
+                              isDark ? Colors.white : const Color(0xFF5A7B65),
                           height: 1.45,
                         ),
                       ),

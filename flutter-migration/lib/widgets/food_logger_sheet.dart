@@ -320,7 +320,8 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                   itemBuilder: (context, index) {
                     final item = _selectedFoods[index];
                     return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: Color(0xFFEAF8EF),
                         borderRadius: BorderRadius.circular(12),
@@ -345,7 +346,8 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                               ),
                               Text(
                                 '${item.quantity.toInt()}g',
-                                style: TextStyle(fontSize: 10, color: Color(0xFF6A8D76)),
+                                style: TextStyle(
+                                    fontSize: 10, color: Color(0xFF6A8D76)),
                               ),
                             ],
                           ),
@@ -353,8 +355,10 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                           IconButton(
                             padding: EdgeInsets.zero,
                             constraints: BoxConstraints(),
-                            icon: Icon(Icons.close_rounded, size: 16, color: Color(0xFF2E8A5E)),
-                            onPressed: () => setState(() => _selectedFoods.removeAt(index)),
+                            icon: Icon(Icons.close_rounded,
+                                size: 16, color: Color(0xFF2E8A5E)),
+                            onPressed: () =>
+                                setState(() => _selectedFoods.removeAt(index)),
                           ),
                         ],
                       ),
@@ -405,7 +409,8 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
                                 final qty = _parseQuantity() ?? 100;
                                 if (qty <= 0) return;
                                 setState(() {
-                                  _selectedFoods.add((food: food, quantity: qty));
+                                  _selectedFoods
+                                      .add((food: food, quantity: qty));
                                 });
                               },
                               borderRadius: BorderRadius.circular(14),

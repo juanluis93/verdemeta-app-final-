@@ -1831,345 +1831,151 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         builder: (_) => const RecipeTodayScreen(),
       ),
     );
-    return;
-
-    final plan = _monthlyDietPlan;
-    if (plan == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _t(
-              'Primero genera una dieta en Planificador para ver recetas diarias.',
-              'Generate a diet in Planner first to view daily recipes.',
-            ),
-          ),
-        ),
-      );
-      await _openDietPlanner();
-      return;
-    }
-
-    final firstDate = DateTime(plan.year, plan.month, 1);
-    final lastDate = DateTime(plan.year, plan.month + 1, 0);
-    var selectedDate = DateTime.now();
-    if (selectedDate.isBefore(firstDate) || selectedDate.isAfter(lastDate)) {
-      selectedDate = firstDate;
-    }
-
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final dayPlan = _getDailyPlanForDate(selectedDate);
-
-            final items = dayPlan?.items ?? const <_PlannedMealItem>[];
-            final mealOrder = ['breakfast', 'lunch', 'snack', 'dinner'];
-
-            return AlertDialog(
-              title: Text(_t('Platos del día', 'Daily dishes')),
-              content: SizedBox(
-                width: 420,
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _t(
-                                'Día ${selectedDate.day} de ${_monthLabel(selectedDate.month)} ${selectedDate.year}',
-                                'Day ${selectedDate.day} of ${_monthLabel(selectedDate.month)} ${selectedDate.year}',
-                              ),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF325441),
-                              ),
-                            ),
-                          ),
-                          TextButton.icon(
-                            onPressed: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: selectedDate,
-                                firstDate: firstDate,
-                                lastDate: lastDate,
-                              );
-                              if (picked == null) return;
-                              setDialogState(() => selectedDate = picked);
-                            },
-                            icon: const Icon(Icons.calendar_month_rounded),
-                            label: Text(_t('Cambiar', 'Change')),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: FilledButton.tonalIcon(
-                                onPressed: dayPlan == null
-                                    ? null
-                                    : () async {
-                                        Navigator.of(context).pop();
-                                        await _openDayCustomization(
-                                            selectedDate);
-                                      },
-                                icon: const Icon(Icons.tune_rounded),
-                                label: Text(
-                                    _t('Personalizar día', 'Customize day')),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (dayPlan != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          '${dayPlan.totals.calories.toStringAsFixed(0)} kcal · '
-                          'P ${dayPlan.totals.protein.toStringAsFixed(0)}g · '
-                          'C ${dayPlan.totals.carbs.toStringAsFixed(0)}g · '
-                          'G ${dayPlan.totals.fat.toStringAsFixed(0)}g',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF6A8D76),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ...mealOrder.map((mealKey) {
-                          final mealItems = items
-                              .where((item) => item.mealKey == mealKey)
-                              .toList();
-                          if (mealItems.isEmpty) {
-                            return const SizedBox.shrink();
-                          }
-
-                          return Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF9FCF9),
-                              borderRadius: BorderRadius.circular(12),
-                              border:
-                                  Border.all(color: const Color(0xFFDDEBDD)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${_mealLabel(mealKey)} · ${_t('Platos', 'Dishes')} ${mealItems.length}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF2A4B38),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                ...mealItems.asMap().entries.map(
-                                  (entry) {
-                                    final dishIndex = entry.key + 1;
-                                    final item = entry.value;
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 3),
-                                      child: Row(
-                                        children: [
-                                          Text(
-                                            item.food.emoji,
-                                            style:
-                                                const TextStyle(fontSize: 18),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              '${_t('Plato', 'Dish')} $dishIndex · ${item.food.name}',
-                                              style: const TextStyle(
-                                                color: Color(0xFF325441),
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                          Text(
-                                            '${item.grams.toStringAsFixed(0)}g',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              color: Color(0xFF2E8A5E),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ] else
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            _t(
-                              'No hay receta planificada para esta fecha.',
-                              'There is no planned recipe for this date.',
-                            ),
-                            style: const TextStyle(color: Color(0xFF6A8D76)),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(_t('Cerrar', 'Close')),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
   }
 
   Future<void> _openDietPlanner() async {
     if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const PlanificarHomeScreen(),
-      ),
-    );
-    return;
-
     final now = DateTime.now();
+    var selectedYear = now.year;
+    var selectedMonth = now.month;
+    var prioritizeQuickFoods = true;
+    var manualMode = false;
+
     final request = await showDialog<_PlannerRequest>(
       context: context,
       builder: (context) {
-        var selectedMonth = now.month;
-        var selectedYear = now.year;
-        var prioritizeQuickFoods = true;
-        var manualMode = false;
-
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(_t('Generar dieta mensual', 'Generate monthly diet')),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            value: selectedMonth,
-                            decoration: InputDecoration(
-                              labelText: _t('Mes', 'Month'),
+              title: Text(_t('Planificador mensual', 'Monthly planner')),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _t(
+                          'Configura mes y enfoque del plan.',
+                          'Set month and planning preferences.',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: selectedMonth,
+                              decoration: InputDecoration(
+                                labelText: _t('Mes', 'Month'),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              items: List.generate(
+                                12,
+                                (index) => DropdownMenuItem<int>(
+                                  value: index + 1,
+                                  child: Text(_monthLabel(index + 1)),
+                                ),
+                              ),
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setDialogState(() => selectedMonth = value);
+                              },
                             ),
-                            items: List.generate(12, (index) {
-                              final month = index + 1;
-                              return DropdownMenuItem<int>(
-                                value: month,
-                                child: Text(_monthLabel(month)),
-                              );
-                            }),
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setDialogState(() => selectedMonth = value);
-                            },
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: selectedYear,
+                              decoration: InputDecoration(
+                                labelText: _t('Año', 'Year'),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              items: [
+                                now.year - 1,
+                                now.year,
+                                now.year + 1,
+                              ]
+                                  .map(
+                                    (year) => DropdownMenuItem<int>(
+                                      value: year,
+                                      child: Text('$year'),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setDialogState(() => selectedYear = value);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5FAF5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFDDEBDD)),
+                        ),
+                        child: Text(
+                          _t(
+                            'Las calorías, macros y micronutrientes se calculan automáticamente desde tu perfil. No necesitas ingresar números.',
+                            'Calories, macros, and micronutrients are calculated automatically from your profile. No manual numbers required.',
+                          ),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF466D54),
+                            height: 1.35,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            value: selectedYear,
-                            decoration: InputDecoration(
-                              labelText: _t('Año', 'Year'),
-                            ),
-                            items: [
-                              now.year,
-                              now.year + 1,
-                            ]
-                                .map(
-                                  (year) => DropdownMenuItem<int>(
-                                    value: year,
-                                    child: Text('$year'),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setDialogState(() => selectedYear = value);
-                            },
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile.adaptive(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: prioritizeQuickFoods,
+                        onChanged: (value) {
+                          setDialogState(() => prioritizeQuickFoods = value);
+                        },
+                        title: Text(
+                          _t(
+                            'Priorizar comidas rápidas',
+                            'Prioritize quick meals',
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5FAF5),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFDDEBDD)),
-                      ),
-                      child: Text(
-                        _t(
-                          'Las calorías, macros y micronutrientes se calculan automáticamente desde tu perfil. No necesitas ingresar números.',
-                          'Calories, macros, and micronutrients are calculated automatically from your profile. No manual numbers required.',
-                        ),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF466D54),
-                          height: 1.35,
+                        subtitle: Text(
+                          _t(
+                            'Útil para planes más prácticos entre semana.',
+                            'Useful for practical weekday plans.',
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile.adaptive(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      value: prioritizeQuickFoods,
-                      onChanged: (value) {
-                        setDialogState(() => prioritizeQuickFoods = value);
-                      },
-                      title: Text(
-                        _t('Priorizar comidas rápidas',
-                            'Prioritize quick meals'),
-                      ),
-                      subtitle: Text(
-                        _t(
-                          'Útil para planes más prácticos entre semana.',
-                          'Useful for practical weekday plans.',
+                      const SizedBox(height: 4),
+                      SwitchListTile.adaptive(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: manualMode,
+                        onChanged: (value) {
+                          setDialogState(() => manualMode = value);
+                        },
+                        title: Text(
+                          _t('Modo manual asistido', 'Assisted manual mode'),
+                        ),
+                        subtitle: Text(
+                          _t(
+                            'Genera un borrador editable para personalizar plato por plato.',
+                            'Generates an editable draft so you can customize dish by dish.',
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    SwitchListTile.adaptive(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      value: manualMode,
-                      onChanged: (value) {
-                        setDialogState(() => manualMode = value);
-                      },
-                      title: Text(
-                        _t('Modo manual asistido', 'Assisted manual mode'),
-                      ),
-                      subtitle: Text(
-                        _t(
-                          'Genera un borrador editable para personalizar plato por plato.',
-                          'Generates an editable draft so you can customize dish by dish.',
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -2618,6 +2424,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final isDarkSheet = Theme.of(context).brightness == Brightness.dark;
+            const switchActiveTrack = Color(0xFF2E8A5E);
+            final switchInactiveTrack =
+                isDarkSheet ? const Color(0xFF6F7A74) : const Color(0xFFB9C4BE);
             final sheetTitle =
                 selectedLanguage == 'es' ? 'Configuracion' : 'Settings';
             final languageLabel =
@@ -2688,9 +2498,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         },
                       ),
                       const SizedBox(height: 6),
-                      SwitchListTile.adaptive(
+                      SwitchListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
+                        activeColor: Colors.white,
+                        activeTrackColor: switchActiveTrack,
+                        inactiveThumbColor: Colors.white,
+                        inactiveTrackColor: switchInactiveTrack,
                         secondary: Icon(
                           notificationsEnabled
                               ? Icons.notifications_active_rounded
@@ -2707,9 +2521,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         },
                       ),
                       const SizedBox(height: 4),
-                      SwitchListTile.adaptive(
+                      SwitchListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
+                        activeColor: Colors.white,
+                        activeTrackColor: switchActiveTrack,
+                        inactiveThumbColor: Colors.white,
+                        inactiveTrackColor: switchInactiveTrack,
                         title: Row(
                           children: [
                             Text(
@@ -3351,6 +3169,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildInicioContent() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final popularFoods =
         (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods)
             .take(8)
@@ -3371,20 +3190,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 16),
                 Text(
                   _t('¡Hola!', 'Hello!'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 42,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF4B2D20),
+                    color: isDark ? Colors.white : const Color(0xFF4B2D20),
                     height: 1.0,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _t('Come saludable y vive vegano', 'Eat Healthy & Go Vegan'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF5A3A2B),
+                    color: isDark ? Colors.white70 : const Color(0xFF5A3A2B),
                     height: 1.1,
                   ),
                 ),
@@ -3393,16 +3212,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAF5D8),
+                    color: isDark
+                        ? const Color(0xFF2B3A30)
+                        : const Color(0xFFEAF5D8),
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: const Color(0xFFBFD6A6)),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF4E6759)
+                          : const Color(0xFFBFD6A6),
+                    ),
                   ),
                   child: Text(
                     'Build $_buildStamp',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF4F6B2E),
+                      color: isDark ? Colors.white : const Color(0xFF4F6B2E),
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -3460,10 +3285,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     Text(
                       _t('Recetas populares', 'Popular Recipes'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF513327),
+                        color: isDark ? Colors.white : const Color(0xFF513327),
                       ),
                     ),
                     const Spacer(),
@@ -3471,7 +3296,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onPressed: () => _showComingSoon('Lista completa'),
                       icon: const Icon(
                         Icons.chevron_right_rounded,
-                        color: Color(0xFF8D7558),
+                        color: Colors.white70,
                       ),
                     ),
                   ],
@@ -3505,15 +3330,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF4E5),
+                      color: isDark
+                          ? const Color(0xFF3A2F25)
+                          : const Color(0xFFFFF4E5),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFFFCC80)),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF8D6E4A)
+                            : const Color(0xFFFFCC80),
+                      ),
                     ),
                     child: Text(
                       _loadError!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF5D4037),
+                        color: isDark ? Colors.white : const Color(0xFF5D4037),
                         height: 1.35,
                       ),
                     ),
@@ -3531,6 +3362,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required double calorieProgress,
     required double calorieRemaining,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
@@ -3546,19 +3378,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 16),
                 Text(
                   _t('Registro de comida', 'Food log'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF244B35),
+                    color: isDark ? Colors.white : const Color(0xFF244B35),
                     height: 1.05,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   _prettyDate,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF6A8D76),
+                    color: isDark ? Colors.white70 : const Color(0xFF6A8D76),
                   ),
                 ),
                 if (_profile == null) ...[
@@ -3567,9 +3399,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF8ED),
+                      color: isDark
+                          ? const Color(0xFF3B3328)
+                          : const Color(0xFFFEF8ED),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFF1D6A8)),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF8B7757)
+                            : const Color(0xFFF1D6A8),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -3586,7 +3424,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ),
                             style: const TextStyle(
                               fontSize: 12.5,
-                              color: Color(0xFF7C623B),
+                              color: Colors.white,
                               height: 1.35,
                             ),
                           ),
@@ -3605,9 +3443,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF4E5),
+                      color: isDark
+                          ? const Color(0xFF3A2F25)
+                          : const Color(0xFFFFF4E5),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFFFCC80)),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF8D6E4A)
+                            : const Color(0xFFFFCC80),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -3621,7 +3465,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             _loadError!,
                             style: const TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF5D4037),
+                              color: Colors.white,
                               height: 1.35,
                             ),
                           ),
@@ -3649,9 +3493,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     'Desliza una comida a los lados o mantenla presionada para eliminarla.',
                     'Swipe a meal sideways or long-press to delete it.',
                   ),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF6A8D76),
+                    color: isDark ? Colors.white70 : const Color(0xFF6A8D76),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -3677,6 +3521,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildChartsContent() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
@@ -3692,10 +3537,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 16),
                 Text(
                   _t('Gráficas diarias', 'Daily Charts'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF244B35),
+                    color: isDark ? Colors.white : const Color(0xFF244B35),
                     height: 1.05,
                   ),
                 ),
@@ -3712,6 +3557,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildCalorieChartCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     double maxCal = 0;
     for (final c in _weeklyCalories) {
       if (c > maxCal) maxCal = c;
@@ -3722,11 +3568,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1C2922) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(isDark ? 0.24 : 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -3737,7 +3583,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           Text(
             _t('Gráfica de calorías diarias', 'Daily calories chart'),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : const Color(0xFF223F31),
+            ),
           ),
           const SizedBox(height: 20),
           SizedBox(
@@ -3759,8 +3609,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(_weeklyLabels[idx],
-                              style: const TextStyle(
-                                  fontSize: 10, color: Colors.grey)),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? Colors.white70 : Colors.grey,
+                              )),
                         );
                       },
                     ),
@@ -3778,7 +3630,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   horizontalLines: [
                     HorizontalLine(
                       y: _calorieGoal,
-                      color: const Color(0xFFE96C79).withOpacity(0.4),
+                      color: (isDark
+                              ? const Color(0xFFFFAAB3)
+                              : const Color(0xFFE96C79))
+                          .withOpacity(0.55),
                       strokeWidth: 2,
                       dashArray: [5, 5],
                     ),
@@ -3806,6 +3661,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildWaterChartCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     double maxWater = 8;
     for (final water in _weeklyWater) {
       if (water > maxWater) maxWater = water.toDouble();
@@ -3814,11 +3670,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1C2922) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(isDark ? 0.24 : 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -3829,7 +3685,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           Text(
             _t('Gráfica de agua diaria', 'Daily water chart'),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : const Color(0xFF223F31),
+            ),
           ),
           const SizedBox(height: 20),
           SizedBox(
@@ -3851,8 +3711,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(_weeklyLabels[idx],
-                              style: const TextStyle(
-                                  fontSize: 10, color: Colors.grey)),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isDark ? Colors.white70 : Colors.grey,
+                              )),
                         );
                       },
                     ),
@@ -3870,7 +3732,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   horizontalLines: [
                     HorizontalLine(
                       y: 8,
-                      color: const Color(0xFF38BDF8).withOpacity(0.5),
+                      color: (isDark
+                              ? const Color(0xFF8DDEFF)
+                              : const Color(0xFF38BDF8))
+                          .withOpacity(0.6),
                       strokeWidth: 2,
                       dashArray: [5, 5],
                     ),
@@ -3989,7 +3854,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Row(
       children: [
         Image.asset(
-          'assets/images/logo.jpeg',
+          'assets/images/VerdeMeta - Iconografia.png',
           height: 22,
           fit: BoxFit.fitHeight,
           alignment: Alignment.centerLeft,
@@ -4276,7 +4141,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Row(
       children: [
         Image.asset(
-          'assets/images/logo.jpeg',
+          'assets/images/VerdeMeta - Iconografia.png',
           height: 50,
           width: 50,
           fit: BoxFit.fitHeight,
