@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/food_models.dart';
 import '../repositories/food_repository.dart';
@@ -68,6 +69,7 @@ class ProfileMeasurementsScreen extends StatefulWidget {
 }
 
 class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
+  static const _undesiredFoodsKey = 'planner_undesired_food_ids';
   static const List<String> _genderOptions = ['female', 'male', 'other'];
   static const List<String> _goalOptions = [
     'deficit',
@@ -97,6 +99,8 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   bool _saving = false;
   List<HealthCondition> _availableConditions = const [];
   Set<int> _selectedConditionIds = <int>{};
+  List<Food> _availableFoods = const [];
+  Set<int> _selectedUndesiredFoodIds = <int>{};
 
   String _safeGender(String value) {
     return _genderOptions.contains(value) ? value : 'female';
@@ -122,6 +126,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadUndesiredFoods();
   }
 
   @override
@@ -173,6 +178,26 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
       });
     } catch (_) {
       // If profile fails to load (for example on web preview), the form remains editable.
+    }
+  }
+
+  Future<void> _loadUndesiredFoods() async {
+    try {
+      final foods = await widget.repository.getAllFoods();
+      final prefs = await SharedPreferences.getInstance();
+      final rawIds = prefs.getStringList(_undesiredFoodsKey) ?? const [];
+      final parsedIds = rawIds
+          .map((id) => int.tryParse(id))
+          .whereType<int>()
+          .toSet();
+
+      if (!mounted) return;
+      setState(() {
+        _availableFoods = foods;
+        _selectedUndesiredFoodIds = parsedIds;
+      });
+    } catch (_) {
+      // Keep the form usable even if foods fail to load.
     }
   }
 
@@ -258,6 +283,102 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                           foregroundColor: Colors.white,
                         ),
                         child: const Text('Aplicar selección'),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickUndesiredFoods() async {
+    if (_availableFoods.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay alimentos disponibles en la base de datos.'),
+        ),
+      );
+      return;
+    }
+
+    final tempSelection = Set<int>.from(_selectedUndesiredFoodIds);
+    final sortedFoods = [..._availableFoods]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFFF9FCF8),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setLocalState) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Alimentos no deseados',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2F7F53),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: sortedFoods.length,
+                        itemBuilder: (context, index) {
+                          final food = sortedFoods[index];
+                          final foodId = food.id;
+                          if (foodId == null) {
+                            return const SizedBox.shrink();
+                          }
+                          final selected = tempSelection.contains(foodId);
+                          return CheckboxListTile(
+                            dense: true,
+                            value: selected,
+                            activeColor: const Color(0xFF2e7d52),
+                            title: Text('${food.emoji} ${food.name}'),
+                            onChanged: (value) {
+                              setLocalState(() {
+                                if (value == true) {
+                                  tempSelection.add(foodId);
+                                } else {
+                                  tempSelection.remove(foodId);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedUndesiredFoodIds = tempSelection;
+                          });
+                          Navigator.of(sheetContext).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2e7d52),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Aplicar seleccion'),
                       ),
                     ),
                   ],
@@ -794,6 +915,10 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
             .where((c) => _selectedConditionIds.contains(c.id))
             .toList(),
       );
+
+      final prefs = await SharedPreferences.getInstance();
+      final ids = _selectedUndesiredFoodIds.map((id) => id.toString()).toList();
+      await prefs.setStringList(_undesiredFoodsKey, ids);
 
       final profile = UserProfile(
         name: _nameCtrl.text.trim(),
@@ -1464,6 +1589,63 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  const Text(
+                                    'ALIMENTOS NO DESEADOS',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1,
+                                      color: Color(0xFF5C846D),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  InkWell(
+                                    onTap: _pickUndesiredFoods,
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: InputDecorator(
+                                      decoration: _mobileInputDecoration(),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              _selectedUndesiredFoodIds.isEmpty
+                                                  ? 'Seleccionar alimentos'
+                                                  : '${_selectedUndesiredFoodIds.length} seleccionados',
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                color: Color(0xFF345646),
+                                              ),
+                                            ),
+                                          ),
+                                          const Icon(
+                                            Icons.keyboard_arrow_down,
+                                            color: Color(0xFF5C846D),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (_selectedUndesiredFoodIds.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: _availableFoods
+                                          .where((food) =>
+                                              food.id != null &&
+                                              _selectedUndesiredFoodIds.contains(
+                                                  food.id))
+                                          .map(
+                                            (food) => Chip(
+                                              label: Text(food.name),
+                                              backgroundColor:
+                                                  const Color(0x142E7D52),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 12),
                                   const Text(
                                     'ENFERMEDADES',
                                     style: TextStyle(

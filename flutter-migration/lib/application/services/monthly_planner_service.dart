@@ -19,16 +19,25 @@ class MonthlyPlannerService {
     required NutritionalGoals goals,
     required List<FoodItem> catalog,
   }) {
+    final effectiveCatalog = catalog
+        .where((item) => !profile.undesiredFoodIds.contains(item.id))
+        .toList(growable: false);
+    if (effectiveCatalog.isEmpty) {
+      throw StateError(
+        'No hay alimentos disponibles despues de aplicar filtros del perfil.',
+      );
+    }
+
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final dayPlans = <DayPlan>[];
 
     for (var day = 1; day <= daysInMonth; day++) {
       final date = DateTime(year, month, day);
-      final draft = _buildInitialDayPlan(date, catalog);
+      final draft = _buildInitialDayPlan(date, effectiveCatalog);
       final balanced = _rebalanceService.rebalanceDay(
         dayPlan: draft,
         goals: goals,
-        catalog: catalog,
+        catalog: effectiveCatalog,
       );
       dayPlans.add(balanced);
     }

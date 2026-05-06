@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/food_models.dart';
@@ -202,6 +203,18 @@ class _MonthlyDietPlan {
   }
 }
 
+class _RecipeDetail {
+  final String subtitle;
+  final List<String> ingredients;
+  final List<String> steps;
+
+  const _RecipeDetail({
+    required this.subtitle,
+    required this.ingredients,
+    required this.steps,
+  });
+}
+
 class HomeScreen extends StatefulWidget {
   final FoodRepository repository;
   final Future<void> Function(BuildContext context) onLogoutRequested;
@@ -235,6 +248,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late ThemeMode _currentThemeMode;
 
   List<Food> _quickFoods = [];
+  List<Food> _allFoods = [];
   List<FoodLogEntry> _todayLog = [];
   Map<int, String> _emojiByFoodId = {};
   Map<String, String> _emojiByFoodName = {};
@@ -259,6 +273,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _monthlyPlanIsValid = false;
   Map<int, List<String>> _planSuggestionsByDay = {};
   int _waterUpdateVersion = 0;
+  Map<String, _RecipeDetail> _recipeDetailsByKey = {};
 
   bool get _isSpanish => _currentLocale.languageCode == 'es';
 
@@ -275,6 +290,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     unawaited(_restoreNotificationPreference());
     _startDayChangeWatcher();
     _loadData();
+    unawaited(_loadRecipeDetails());
   }
 
   @override
@@ -312,6 +328,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     if (oldWidget.themeMode != widget.themeMode) {
       _currentThemeMode = widget.themeMode;
+    }
+  }
+
+  Future<void> _loadRecipeDetails() async {
+    try {
+      final jsonText = await rootBundle.loadString('assets/data/recipe_catalog.json');
+      final decoded = jsonDecode(jsonText) as Map<String, dynamic>;
+      final details = <String, _RecipeDetail>{};
+
+      for (final entry in decoded.entries) {
+        final value = Map<String, dynamic>.from(entry.value as Map);
+        details[entry.key] = _RecipeDetail(
+          subtitle: value['subtitle'] as String? ?? '',
+          ingredients: List<String>.from(value['ingredients'] as List<dynamic>? ?? const []),
+          steps: List<String>.from(value['steps'] as List<dynamic>? ?? const []),
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _recipeDetailsByKey = details;
+      });
+    } catch (error) {
+      debugPrint('No se pudieron cargar las recetas detalladas: $error');
     }
   }
 
@@ -358,6 +401,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _quickFoods = quickFoods;
+        _allFoods = allFoods;
         _todayLog = todayLog;
         _todayTotals = totals;
         _todayWaterCups = waterCups;
@@ -382,6 +426,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       setState(() {
         _quickFoods = fallbackFoods;
+        _allFoods = fallbackFoods;
         _todayLog = [];
         _todayTotals = NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
         _todayWaterCups = 0;
@@ -2560,6 +2605,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                       const SizedBox(height: 8),
                       Text(
+                        selectedLanguage == 'es' ? 'Perfil' : 'Profile',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
+                      const SizedBox(height: 6),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.block_rounded),
+                        title: Text(
+                          selectedLanguage == 'es'
+                              ? 'Alimentos no deseados'
+                              : 'Undesired foods',
+                          style: optionTextStyle,
+                        ),
+                        subtitle: Text(
+                          selectedLanguage == 'es'
+                              ? 'Se guarda dentro de Mis medidas'
+                              : 'Saved inside Measurements',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () async {
+                          Navigator.of(context).pop();
+                          await _openMeasurements();
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
                         feedbackTitle,
                         style:
                             Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -3171,9 +3245,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildInicioContent() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final popularFoods =
-        (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods)
-            .take(8)
-            .toList();
+      (_allFoods.isNotEmpty
+          ? _allFoods
+          : (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods))
+        .toList();
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -4772,9 +4847,353 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  String _normalizeRecipeKey(String value) {
+    const accents = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
+      'ñ': 'n',
+    };
+
+    return value
+        .toLowerCase()
+        .split('')
+        .map((char) => accents[char] ?? char)
+        .join();
+  }
+
+  _RecipeDetail _recipeDetailFor(Food food) {
+    final key = _normalizeRecipeKey(food.name);
+
+    final loadedDetail = _recipeDetailsByKey[key];
+    if (loadedDetail != null) {
+      return loadedDetail;
+    }
+
+    if (key.contains('smoothie bowl de acai') ||
+        key.contains('bowl de acai tropical')) {
+      return _RecipeDetail(
+        subtitle: _t(
+          'Bowl espeso de açaí con granola y frutas frescas.',
+          'Thick acai bowl with granola and fresh fruit.',
+        ),
+        ingredients: const [
+          '2 paquetes de açaí congelado',
+          '1 banana congelada',
+          '1/2 taza de leche de coco',
+          '30 g de granola',
+          '50 g de frutas frescas',
+        ],
+        steps: [
+          _t('Licúa el açaí con banana y leche.', 'Blend acai with banana and milk.'),
+          _t('Sirve espeso en un bowl.', 'Serve thick in a bowl.'),
+          _t('Decora con granola y frutas.', 'Top with granola and fruit.'),
+        ],
+      );
+    }
+
+    if (key.contains('bowl de avena')) {
+      return _RecipeDetail(
+        subtitle: _t(
+          'Avena cremosa con frutos rojos y semillas.',
+          'Creamy oats with berries and seeds.',
+        ),
+        ingredients: const [
+          '60 g de avena en hojuelas',
+          '250 ml de bebida vegetal',
+          '80 g de frutos del bosque',
+          '10 g de semillas de chía',
+        ],
+        steps: [
+          _t('Cocina la avena con la bebida vegetal.', 'Cook oats with plant milk.'),
+          _t('Sirve y agrega frutos del bosque.', 'Serve and add berries.'),
+          _t('Termina con semillas de chía.', 'Finish with chia seeds.'),
+        ],
+      );
+    }
+
+    if (key.contains('tofu revuelto')) {
+      return _RecipeDetail(
+        subtitle: _t(
+          'Tofu salteado con verduras para un desayuno proteico.',
+          'Sauteed tofu with veggies for a high-protein breakfast.',
+        ),
+        ingredients: const [
+          '150 g de tofu firme',
+          '60 g de espinaca',
+          '40 g de cebolla',
+          '1 cda de levadura nutricional',
+        ],
+        steps: [
+          _t('Desmenuza el tofu.', 'Crumble the tofu.'),
+          _t('Saltea con cebolla y espinaca.', 'Saute with onion and spinach.'),
+          _t('Añade levadura nutricional al final.', 'Add nutritional yeast at the end.'),
+        ],
+      );
+    }
+
+    if (key.contains('burrito bowl')) {
+      return _RecipeDetail(
+        subtitle: _t(
+          'Bowl completo con frijoles, arroz y vegetales.',
+          'Complete bowl with beans, rice and veggies.',
+        ),
+        ingredients: const [
+          '120 g de frijoles cocidos',
+          '120 g de arroz integral cocido',
+          '70 g de maíz y pimiento',
+          '40 g de guacamole',
+        ],
+        steps: [
+          _t('Sirve arroz y frijoles como base.', 'Place rice and beans as base.'),
+          _t('Agrega vegetales por encima.', 'Add veggies on top.'),
+          _t('Termina con guacamole.', 'Finish with guacamole.'),
+        ],
+      );
+    }
+
+    return _RecipeDetail(
+      subtitle: _t(
+        'Preparación detallada no disponible todavía.',
+        'Detailed preparation is not available yet.',
+      ),
+      ingredients: const [
+        'Recarga la pantalla para cargar la receta completa',
+      ],
+      steps: [
+        _t(
+          'La receta detallada aún se está cargando o no está disponible en el catálogo.',
+          'The detailed recipe is still loading or is unavailable in the catalog.',
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showRecipeDetailModal(Food food) async {
+    final detail = _recipeDetailFor(food);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.78,
+          maxChildSize: 0.92,
+          minChildSize: 0.55,
+          expand: false,
+          builder: (context, controller) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD5DBD6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text(food.emoji, style: const TextStyle(fontSize: 34)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          food.name,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1F3B2D),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    detail.subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF5D7668),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildMacroChip('${food.calories.toInt()}', _t('Kcal', 'Kcal')),
+                      _buildMacroChip('${food.protein.toStringAsFixed(0)}g', _t('Proteína', 'Protein')),
+                      _buildMacroChip('${food.carbs.toStringAsFixed(0)}g', _t('Carbos', 'Carbs')),
+                      _buildMacroChip('${food.fat.toStringAsFixed(0)}g', _t('Grasas', 'Fat')),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _t('Ingredientes', 'Ingredients'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF587164),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...detail.ingredients.map(
+                    (ingredient) => Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF1EB),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.fiber_manual_record_rounded,
+                            size: 8,
+                            color: Color(0xFF3C6E51),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              ingredient,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF2F4D3C),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _t('Preparación', 'Preparation'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF587164),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...detail.steps.asMap().entries.map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE4ECE6),
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                            child: Text(
+                              '${entry.key + 1}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF3C6E51),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              entry.value,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF2F4D3C),
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _addQuickFood(food);
+                    },
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(_t('Agregar al registro', 'Add to log')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E8A5E),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMacroChip(String value, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF1EB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD6E2D9)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF2E8A5E),
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF5D7668),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuickFoodCard(Food food) {
     return InkWell(
-      onTap: () => _addQuickFood(food),
+      onTap: () => _showRecipeDetailModal(food),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,

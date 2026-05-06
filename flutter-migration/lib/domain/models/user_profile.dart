@@ -10,6 +10,7 @@ class UserProfile {
   final GoalType goalType;
   final Set<String> dietaryPreferences;
   final Set<String> restrictions;
+  final Set<int> undesiredFoodIds;
 
   const UserProfile({
     required this.id,
@@ -21,6 +22,7 @@ class UserProfile {
     required this.goalType,
     required this.dietaryPreferences,
     required this.restrictions,
+    this.undesiredFoodIds = const <int>{},
   });
 
   UserProfile copyWith({
@@ -33,6 +35,7 @@ class UserProfile {
     GoalType? goalType,
     Set<String>? dietaryPreferences,
     Set<String>? restrictions,
+    Set<int>? undesiredFoodIds,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -44,6 +47,7 @@ class UserProfile {
       goalType: goalType ?? this.goalType,
       dietaryPreferences: dietaryPreferences ?? this.dietaryPreferences,
       restrictions: restrictions ?? this.restrictions,
+      undesiredFoodIds: undesiredFoodIds ?? this.undesiredFoodIds,
     );
   }
 }
