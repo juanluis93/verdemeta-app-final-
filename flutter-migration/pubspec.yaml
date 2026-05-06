@@ -57,7 +57,7 @@ flutter:
     - assets/images/lconologo.ico
     - assets/images/VerdeMeta - Iconografia.png
     - web/icons/Icon-192.png
-  
+    - assets/data/
   # Fuentes (descarga Google Fonts: Fraunces y Plus Jakarta Sans)
   # fonts:
   #   - family: Fraunces

@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS foods (
     b12 REAL DEFAULT 0,
     zinc REAL DEFAULT 0,
     
+    -- Receta (nuevo campo v9)
+    ingredientes TEXT, -- JSON array de ingredientes
+    preparacion TEXT,  -- Instrucciones paso a paso en texto
+    
     -- Metadata
     is_quick_food INTEGER DEFAULT 0, -- 1 = aparece en quick foods, 0 = no
     created_at INTEGER DEFAULT (strftime('%s', 'now')),

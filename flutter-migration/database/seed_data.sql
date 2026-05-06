@@ -1,22 +1,22 @@
 -- ═══════════════════════════════════════════════════
--- SEED DATA - ALIMENTOS VEGANOS
--- Datos iniciales para la base de datos
+-- SEED DATA v9 - ALIMENTOS VEGANOS CON RECETAS
+-- Datos iniciales con 105 recetas detalladas
 -- ═══════════════════════════════════════════════════
 
--- QUICK FOODS (12 alimentos frecuentes)
-INSERT INTO foods (name, emoji, calories, protein, carbs, fat, fiber, sugar, iron, calcium, b12, zinc, is_quick_food) VALUES
-('Tofu firme', '🧊', 80, 8.5, 1.9, 4.8, 0.3, 0.6, 1.3, 200, 0, 0.8, 1),
-('Lentejas cocidas', '🫘', 116, 9, 20, 0.4, 8, 1.8, 3.3, 19, 0, 1.3, 1),
-('Garbanzos', '🫙', 164, 8.9, 27, 2.6, 7.6, 4.8, 2.9, 49, 0, 1.5, 1),
-('Quinoa cocida', '🌾', 120, 4.4, 21.3, 1.9, 2.8, 0.9, 1.5, 17, 0, 1.1, 1),
-('Espinaca', '🥬', 23, 2.9, 3.6, 0.4, 2.2, 0.4, 2.7, 99, 0, 0.5, 1),
-('Aguacate', '🥑', 160, 2, 9, 14.7, 6.7, 0.7, 0.6, 12, 0, 0.6, 1),
-('Plátano', '🍌', 89, 1.1, 23, 0.3, 2.6, 12, 0.3, 5, 0, 0.2, 1),
-('Leche de soja', '🥛', 54, 3.3, 6.3, 1.8, 0.6, 4.8, 0.4, 120, 1.2, 0.3, 1),
-('Nueces', '🥜', 654, 15, 14, 65, 6.7, 2.6, 2.9, 98, 0, 3.1, 1),
-('Brócoli', '🥦', 34, 2.8, 7, 0.4, 2.6, 1.7, 0.7, 47, 0, 0.4, 1),
-('Arroz integral', '🍚', 216, 5, 45, 1.8, 3.5, 0.7, 1.1, 20, 0, 1.2, 1),
-('Tempeh', '🟫', 195, 20, 7.6, 11, 5, 0, 2.7, 184, 0, 1.7, 1);
+-- QUICK FOODS (12 alimentos frecuentes - SIN RECETAS DETALLADAS)
+INSERT INTO foods (id, name, emoji, calories, protein, carbs, fat, fiber, sugar, iron, calcium, b12, zinc, is_quick_food, ingredientes, preparacion) VALUES
+(1000, 'Tofu firme', '🧊', 80, 8.5, 1.9, 4.8, 0.3, 0.6, 1.3, 200, 0, 0.8, 1, '["Tofu firme"]', 'Alimento básico vegano rico en proteína'),
+(1001, 'Lentejas cocidas', '🫘', 116, 9, 20, 0.4, 8, 1.8, 3.3, 19, 0, 1.3, 1, '["Lentejas"]', 'Alimento nutritivo con proteína vegetal'),
+(1002, 'Garbanzos', '🫙', 164, 8.9, 27, 2.6, 7.6, 4.8, 2.9, 49, 0, 1.5, 1, '["Garbanzos"]', 'Legumbre versátil y nutritiva'),
+(1003, 'Quinoa cocida', '🌾', 120, 4.4, 21.3, 1.9, 2.8, 0.9, 1.5, 17, 0, 1.1, 1, '["Quinoa"]', 'Seudocereal completo en aminoácidos'),
+(1004, 'Espinaca', '🥬', 23, 2.9, 3.6, 0.4, 2.2, 0.4, 2.7, 99, 0, 0.5, 1, '["Espinaca"]', 'Verdura de hoja verde rica en hierro'),
+(1005, 'Aguacate', '🥑', 160, 2, 9, 14.7, 6.7, 0.7, 0.6, 12, 0, 0.6, 1, '["Aguacate"]', 'Fruta con grasas saludables'),
+(1006, 'Plátano', '🍌', 89, 1.1, 23, 0.3, 2.6, 12, 0.3, 5, 0, 0.2, 1, '["Plátano"]', 'Fruta rica en potasio y energía'),
+(1007, 'Leche de soja', '🥛', 54, 3.3, 6.3, 1.8, 0.6, 4.8, 0.4, 120, 1.2, 0.3, 1, '["Leche de soja"]', 'Bebida vegetal alternativa a la leche'),
+(1008, 'Nueces', '🥜', 654, 15, 14, 65, 6.7, 2.6, 2.9, 98, 0, 3.1, 1, '["Nueces"]', 'Frutos secos ricos en Omega-3'),
+(1009, 'Brócoli', '🥦', 34, 2.8, 7, 0.4, 2.6, 1.7, 0.7, 47, 0, 0.4, 1, '["Brócoli"]', 'Verdura crucífera nutritiva'),
+(1010, 'Arroz integral', '🍚', 216, 5, 45, 1.8, 3.5, 0.7, 1.1, 20, 0, 1.2, 1, '["Arroz integral"]', 'Cereal completo'),
+(1011, 'Tempeh', '🟫', 195, 20, 7.6, 11, 5, 0, 2.7, 184, 0, 1.7, 1, '["Tempeh"]', 'Alimento fermentado de soja con proteína');
 
 -- ALIAS para quick foods
 INSERT INTO food_aliases (food_id, alias) VALUES
