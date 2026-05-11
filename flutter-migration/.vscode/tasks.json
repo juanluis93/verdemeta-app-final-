@@ -6,6 +6,17 @@
 			"type": "shell",
 			"command": "$env:JAVA_HOME='C:\\Program Files\\Android\\Android Studio\\jbr'; $env:Path=\"$env:JAVA_HOME\\bin;$env:Path\"; flutter build apk --release",
 			"isBackground": false
+		},
+		{
+			"label": "build-apk-release",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"apk",
+				"--release"
+			],
+			"isBackground": false
 		}
 	]
 }

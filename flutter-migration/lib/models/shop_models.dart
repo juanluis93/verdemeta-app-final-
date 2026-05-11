@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+
+class Product {
+  final int id;
+  final String category;
+  final String image;
+  final String name;
+  final String description;
+  final double price;
+  final double? oldPrice;
+  final String? badge;
+  final String redbubbleType;
+  final String redbubbleSlug;
+
+  const Product({
+    required this.id,
+    required this.category,
+    required this.image,
+    required this.name,
+    required this.description,
+    required this.price,
+    this.oldPrice,
+    this.badge,
+    required this.redbubbleType,
+    required this.redbubbleSlug,
+  });
+}
+
+const List<Product> SHOP_PRODUCTS = [
+  Product(
+    id: 1,
+    category: 'ropa',
+    image: 'https://ih1.redbubble.net/image.6116118849.0530/ssrco,oversize_tee,mens,ffffff:affd82b53f,front,close_portrait,x1000.jpg',
+    name: 'Camiseta Oversized "Fusión Verde"',
+    description: 'Camiseta oversized unisex con diseño exclusivo VerdeMeta.',
+    price: 27.5,
+    badge: 'new',
+    redbubbleType: 't-shirt',
+    redbubbleSlug: 'rh5j',
+),
+  Product(
+    id: 2,
+    category: 'ropa',
+    image: 'https://ih1.redbubble.net/image.6116118849.0530/ssrco,oversized_hoodie,mens_01,e8e6e1:aa8ffd9f0f,front,close_portrait,x1000.jpg',
+    name: 'Hoodie Premium Oversized',
+    description: 'Sudadera premium oversized con capucha y diseño VerdeMeta.',
+    price: 63.25,
+    badge: 'best',
+    redbubbleType: 'hoodie',
+    redbubbleSlug: 'ng59',
+  ),
+  Product(
+    id: 3,
+    category: 'ropa',
+    image: 'https://ih1.redbubble.net/image.6116118849.0530/ssrco,tank_top,mens_01,fafafa:ca443f4786,front,close_portrait,x1000.webp',
+    name: 'Tank Top "Fusión Verde"',
+    description: 'Tank top ligero y cómodo para el día a día.',
+    price: 22.13,
+    redbubbleType: 'tank-top',
+    redbubbleSlug: '5xql',
+  ),
+  Product(
+    id: 4,
+    category: 'ropa',
+    image: 'https://ih1.redbubble.net/image.6116118842.0530/ssrco,bucket_hat,product,e5d6c5:f62bbf65ee,primary,wide_portrait,750x1000-bg,f8f8f8.webp',
+    name: 'Bucket Hat VerdeMeta',
+    description: 'Bucket hat con diseño Fusión Verde. Talla única.',
+    price: 24.7,
+    badge: 'new',
+    redbubbleType: 'bucket-hat',
+    redbubbleSlug: '3vy7',
+  ),
+  Product(
+    id: 5,
+    category: 'ropa',
+    image: 'https://ih1.redbubble.net/image.6116118851.0530/ur,apron_realistic_flatlay,tall_portrait,750x1000.webp',
+    name: 'Delantal "Fusión Verde"',
+    description: 'Delantal con diseño VerdeMeta para cocinar vegano.',
+    price: 22.13,
+    redbubbleType: 'apron',
+    redbubbleSlug: '2b5j',
+  ),
+  Product(
+    id: 6,
+    category: 'ropa',
+    image: 'https://ih1.redbubble.net/image.6116118857.0530/ur,socks_flatlay_01,tall_portrait,750x1000.webp',
+    name: 'Calcetines VerdeMeta',
+    description: 'Calcetines con estampado del diseño Fusión Verde.',
+    price: 15.58,
+    redbubbleType: 'socks',
+    redbubbleSlug: 'sr4q',
+  ),
+  Product(
+    id: 7,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118840.0530/ur,mouse_pad_small_flatlay_prop,wide_portrait,750x1000.webp',
+    name: 'Mouse Pad VerdeMeta',
+    description: 'Mouse pad con diseño Fusión Verde y base antideslizante.',
+    price: 20.16,
+    badge: 'new',
+    redbubbleType: 'mouse-pad',
+    redbubbleSlug: '2mh5',
+  ),
+  Product(
+    id: 8,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118838.0530/icr,iphone_17_toughmagsafe,back,a,x1000-bg,f8f8f8.webp',
+    name: 'iPhone Magsafe Tough Case',
+    description: 'Funda resistente MagSafe con diseño VerdeMeta.',
+    price: 44.91,
+    badge: 'best',
+    redbubbleType: 'iphone-case',
+    redbubbleSlug: 'c4kx',
+  ),
+  Product(
+    id: 9,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118865.0530/ur,desk_mat_flatlay_prop,wide_portrait,750x1000.webp',
+    name: 'Desk Mat VerdeMeta',
+    description: 'Alfombrilla de escritorio XL con diseño Fusión Verde.',
+    price: 33.45,
+    redbubbleType: 'mouse-pad',
+    redbubbleSlug: '4qvw',
+  ),
+  Product(
+    id: 10,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118841.0530/sss,small,product,750x1000.webp',
+    name: 'Sticker "Fusión Verde"',
+    description: 'Sticker de vinilo de alta calidad, resistente al agua.',
+    price: 3.24,
+    redbubbleType: 'sticker',
+    redbubbleSlug: '7sgk',
+  ),
+  Product(
+    id: 11,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118845.0530/tb,1000x1000,medium-pad,750x1000,f8f8f8.webp',
+    name: 'Tote Bag All Over Print',
+    description: 'Bolsa tote con estampado completo Fusión Verde.',
+    price: 24.4,
+    badge: 'best',
+    redbubbleType: 'tote-bag',
+    redbubbleSlug: 'xd4m',
+  ),
+  Product(
+    id: 12,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118836.0530/ur,pin_small_front,wide_portrait,750x1000.webp',
+    name: 'Pin VerdeMeta',
+    description: 'Pin metálico con diseño Fusión Verde.',
+    price: 3.37,
+    redbubbleType: 'pin',
+    redbubbleSlug: 'lw9c',
+  ),
+  Product(
+    id: 13,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118834.0530/ur,mug_lifestyle,tall_portrait,750x1000.webp',
+    name: 'Taza Clásica VerdeMeta',
+    description: 'Taza de cerámica con diseño Fusión Verde.',
+    price: 17.31,
+    badge: 'best',
+    redbubbleType: 'mug',
+    redbubbleSlug: '7yqg',
+  ),
+  Product(
+    id: 14,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118846.0530/pr,150x100,750x1000-bg,f8f8f8.webp',
+    name: 'Zipper Pouch VerdeMeta',
+    description: 'Neceser con cierre y diseño Fusión Verde.',
+    price: 13.46,
+    redbubbleType: 'pouch',
+    redbubbleSlug: 'lwbc',
+  ),
+  Product(
+    id: 15,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118839.0530/sn,x1000-pad,750x1000,f8f8f8.webp',
+    name: 'Spiral Notebook VerdeMeta',
+    description: 'Cuaderno de espiral con tapa Fusión Verde.',
+    price: 13.95,
+    badge: 'new',
+    redbubbleType: 'notebook',
+    redbubbleSlug: 'qhru',
+  ),
+  Product(
+    id: 16,
+    category: 'accesorios',
+    image: 'https://ih1.redbubble.net/image.6116118841.0530/mo,small,fridge_close,tall_portrait,750x1000.2.webp',
+    name: 'Imán "Fusión Verde"',
+    description: 'Imán decorativo con diseño VerdeMeta.',
+    price: 7.33,
+    redbubbleType: 'magnet',
+    redbubbleSlug: '9gzh',
+  ),
+];
+
+const Map<String, Map<String, dynamic>> badgeConfig = {
+  'new': {
+    'emoji': '✨',
+    'label': 'Nuevo',
+    'color': Color(0xFF2E8A5E),
+  },
+  'best': {
+    'emoji': '⭐',
+    'label': 'Más vendido',
+    'color': Color(0xFFA78E2A),
+  },
+  'sale': {
+    'emoji': '🔥',
+    'label': 'Oferta',
+    'color': Color(0xFFC41E3A),
+  },
+};

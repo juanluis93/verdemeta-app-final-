@@ -9,10 +9,12 @@ class AddFoodBottomSheet extends StatefulWidget {
   final FoodRepository repository;
   final List<Food> fallbackFoods;
   final String initialMealTime;
+  final Set<int> excludedFoodIds;
 
   const AddFoodBottomSheet({
     required this.repository,
     required this.fallbackFoods,
+    required this.excludedFoodIds,
     required this.initialMealTime,
   });
 
@@ -41,7 +43,7 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
     _mealTime = _mealOptions.contains(widget.initialMealTime)
         ? widget.initialMealTime
         : 'Desayuno';
-    _results = widget.fallbackFoods.take(12).toList();
+    _results = _applyExcludedFoods(widget.fallbackFoods).take(12).toList();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -76,7 +78,7 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
       if (!mounted) return;
       setState(() {
         _searching = false;
-        _results = widget.fallbackFoods.take(12).toList();
+        _results = _applyExcludedFoods(widget.fallbackFoods).take(12).toList();
       });
       return;
     }
@@ -89,10 +91,10 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
 
       setState(() {
         _searching = false;
-        _results = foods;
+        _results = _applyExcludedFoods(foods);
       });
     } catch (_) {
-      final local = widget.fallbackFoods.where((food) {
+      final local = _applyExcludedFoods(widget.fallbackFoods).where((food) {
         final normalizedName = _normalizeSearchText(food.name);
         return normalizedName.contains(normalizedQuery);
       }).toList()
@@ -112,6 +114,14 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
         _results = local;
       });
     }
+  }
+
+  List<Food> _applyExcludedFoods(List<Food> foods) {
+    if (widget.excludedFoodIds.isEmpty) return foods;
+    return foods
+        .where((food) =>
+            food.id == null || !widget.excludedFoodIds.contains(food.id))
+        .toList();
   }
 
   String _normalizeSearchText(String value) {

@@ -8,12 +8,14 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/food_models.dart';
+import '../models/shop_models.dart';
 import '../repositories/food_repository.dart';
 import '../services/daily_macro_notification_service.dart';
 import '../widgets/food_logger_sheet.dart';
 import '../presentation/screens/planificar_home_screen.dart';
 import '../presentation/screens/recipe_today_screen.dart';
 import 'profile_measurements_screen.dart';
+import 'shop_screen.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 enum _HomeMenuAction { settings, feedback, measurements, logout }
@@ -240,6 +242,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _notificationsEnabledBaseKey =
       'daily_macro_notifications_enabled';
+  static const _undesiredFoodsKey = 'planner_undesired_food_ids';
   static const _monthlyPlannerBaseKey = 'monthly_diet_plan_v2';
   static const _buildStamp = 'DIETA-2026-04-05-C';
 
@@ -252,6 +255,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<FoodLogEntry> _todayLog = [];
   Map<int, String> _emojiByFoodId = {};
   Map<String, String> _emojiByFoodName = {};
+  Set<int> _undesiredFoodIds = <int>{};
   int _activeSection = 0;
   String? _loadError;
   UserProfile? _profile;
@@ -360,6 +364,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadData() async {
     final todayKey = _todayKey;
+    final prefs = await SharedPreferences.getInstance();
+    final rawUndesiredIds = prefs.getStringList(_undesiredFoodsKey) ?? const [];
+    final undesiredFoodIds = rawUndesiredIds
+        .map((id) => int.tryParse(id))
+        .whereType<int>()
+        .toSet();
 
     setState(() {
       _loading = true;
@@ -406,6 +416,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _todayTotals = totals;
         _todayWaterCups = waterCups;
         _profile = profile;
+        _undesiredFoodIds = undesiredFoodIds;
         _emojiByFoodId = emojiIndex.byId;
         _emojiByFoodName = emojiIndex.byName;
         _weeklyCalories = weeklyCal;
@@ -431,6 +442,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _todayTotals = NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
         _todayWaterCups = 0;
         _profile = null;
+        _undesiredFoodIds = undesiredFoodIds;
         _emojiByFoodId = fallbackEmojiIndex.byId;
         _emojiByFoodName = fallbackEmojiIndex.byName;
         _weeklyCalories = List.filled(7, 0.0);
@@ -595,6 +607,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         repository: _repo,
         fallbackFoods: _quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods,
         initialMealTime: _getCurrentMealTime(),
+        excludedFoodIds: _undesiredFoodIds,
       ),
     );
 
@@ -1595,6 +1608,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return _webPreviewFoods.first;
   }
 
+  Food _pickFoodAvoidingRecent(
+    List<Food> foods,
+    int seed, {
+    Food? fallback,
+    Set<int> recentIds = const {},
+    Food? avoid,
+  }) {
+    if (foods.isEmpty) {
+      if (fallback != null) return fallback;
+      return _webPreviewFoods.first;
+    }
+
+    final length = foods.length;
+    for (var i = 0; i < length; i++) {
+      final candidate = foods[(seed + i) % length];
+      if (candidate.id != avoid?.id && !recentIds.contains(candidate.id)) {
+        return candidate;
+      }
+    }
+
+    for (var i = 0; i < length; i++) {
+      final candidate = foods[(seed + i) % length];
+      if (candidate.id != avoid?.id) {
+        return candidate;
+      }
+    }
+
+    return fallback ?? foods[seed % length];
+  }
+
   List<Food> _sortByMacroDensity(
     List<Food> foods,
     double Function(Food food) macro,
@@ -1823,11 +1866,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final sourceFoods = validFoods.isNotEmpty ? validFoods : _webPreviewFoods;
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final plans = <_DailyDietPlan>[];
+    final recentLunchIds = <int>[];
 
     for (var day = 1; day <= daysInMonth; day++) {
       final seed = (year * 1300) + (month * 50) + day;
       final breakfast = _pickFood(sourceFoods, seed);
-      final lunch = _pickFood(sourceFoods, seed + 7, fallback: breakfast);
+      final lunch = _pickFoodAvoidingRecent(
+        sourceFoods,
+        seed + 7,
+        fallback: breakfast,
+        recentIds: recentLunchIds.toSet(),
+        avoid: breakfast,
+      );
       final snack = _pickFood(sourceFoods, seed + 13, fallback: lunch);
       final dinner = _pickFood(sourceFoods, seed + 19, fallback: breakfast);
 
@@ -1846,6 +1896,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           totals: totals,
         ),
       );
+
+      if (lunch.id != null) {
+        recentLunchIds.add(lunch.id!);
+        if (recentLunchIds.length > 7) {
+          recentLunchIds.removeAt(0);
+        }
+      }
     }
 
     return _MonthlyDietPlan(
@@ -2605,35 +2662,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        selectedLanguage == 'es' ? 'Perfil' : 'Profile',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                      ),
-                      const SizedBox(height: 6),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.block_rounded),
-                        title: Text(
-                          selectedLanguage == 'es'
-                              ? 'Alimentos no deseados'
-                              : 'Undesired foods',
-                          style: optionTextStyle,
-                        ),
-                        subtitle: Text(
-                          selectedLanguage == 'es'
-                              ? 'Se guarda dentro de Mis medidas'
-                              : 'Saved inside Measurements',
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () async {
-                          Navigator.of(context).pop();
-                          await _openMeasurements();
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
                         feedbackTitle,
                         style:
                             Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -3220,7 +3248,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 calorieProgress: calorieProgress,
                                 calorieRemaining: calorieRemaining,
                               )
-                            : _buildChartsContent()),
+                            : (_activeSection == 2
+                                ? _buildChartsContent()
+                                : _buildProfileContent())),
                   ),
           ),
         ],
@@ -3242,12 +3272,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildProfileContent() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openMeasurements();
+    });
+    return Container();
+  }
+
   Widget _buildInicioContent() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final popularFoods =
-      (_allFoods.isNotEmpty
-          ? _allFoods
-          : (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods))
+    final sourceFoods = _allFoods.isNotEmpty
+        ? _allFoods
+        : (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods);
+    final popularFoods = sourceFoods
+        .where(
+          (food) => food.id == null || !_undesiredFoodIds.contains(food.id!),
+        )
         .toList();
 
     return ListView(
@@ -3347,8 +3387,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         icon: Icons.storefront_rounded,
                         label: _t('Tienda', 'Store'),
                         background: const Color(0xFF6CBF72),
-                        onTap: () => _showComingSoon(
-                            _t('Buscador de tiendas', 'Store Finder')),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ShopScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -3884,7 +3929,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: _buildBottomNavItem(
                 icon: Icons.person_rounded,
                 label: _t('Perfil', 'Profile'),
-                onTap: _openMeasurements,
+                active: _activeSection == 3,
+                onTap: () => setState(() => _activeSection = 3),
               ),
             ),
           ],
