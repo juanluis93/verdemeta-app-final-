@@ -257,6 +257,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, String> _emojiByFoodName = {};
   Set<int> _undesiredFoodIds = <int>{};
   int _activeSection = 0;
+  int _lastSectionBeforeProfile = 0;
   String? _loadError;
   UserProfile? _profile;
   int _todayWaterCups = 0;
@@ -599,7 +600,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFFF8FCF8),
+      backgroundColor: const Color(0xFFDCEBDD),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -664,11 +665,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openMeasurements() async {
+    final sectionBeforeOpen = _activeSection == 3 ? _lastSectionBeforeProfile : _activeSection;
     final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => ProfileMeasurementsScreen(repository: _repo),
       ),
     );
+
+    if (mounted && _activeSection == 3) {
+      setState(() => _activeSection = sectionBeforeOpen.clamp(0, 2));
+    }
 
     final saved = switch (result) {
       true => true,
@@ -3273,14 +3279,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildProfileContent() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openMeasurements();
-    });
-    return Container();
+    // Legacy fallback: route profile requests to home content to avoid blank screen.
+    return _buildInicioContent();
   }
 
   Widget _buildInicioContent() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayName = _profile?.name.trim();
+    final greetingName = displayName == null || displayName.isEmpty
+        ? _t('amiga', 'friend')
+        : displayName;
     final sourceFoods = _allFoods.isNotEmpty
         ? _allFoods
         : (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods);
@@ -3304,9 +3312,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _buildHomeTopBar(),
                 const SizedBox(height: 16),
                 Text(
-                  _t('¡Hola!', 'Hello!'),
+                  _t('Hola,', 'Hello,') + ' $greetingName 🌿',
                   style: TextStyle(
-                    fontSize: 42,
+                    fontSize: 29,
                     fontWeight: FontWeight.w800,
                     color: isDark ? Colors.white : const Color(0xFF4B2D20),
                     height: 1.0,
@@ -3314,41 +3322,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _t('Come saludable y vive vegano', 'Eat Healthy & Go Vegan'),
+                  _prettyDate,
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white70 : const Color(0xFF5A3A2B),
+                    color: isDark ? Colors.white70 : const Color(0xFF6A8D76),
                     height: 1.1,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF2B3A30)
-                        : const Color(0xFFEAF5D8),
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF4E6759)
-                          : const Color(0xFFBFD6A6),
-                    ),
-                  ),
-                  child: Text(
-                    'Build $_buildStamp',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF4F6B2E),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 9,
+                      child: _buildCalorieCard(
+                        progress: _calorieGoal <= 0
+                            ? 0.0
+                            : (_todayTotals.calories / _calorieGoal)
+                                .clamp(0.0, 1.0)
+                                .toDouble(),
+                        remaining: math.max(0.0, _calorieGoal - _todayTotals.calories),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      flex: 13,
+                      child: _buildHomeMacroSummaryCard(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 _buildSearchCard(),
+                const SizedBox(height: 16),
+                _buildDietPlannerSummaryCard(),
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -3398,8 +3405,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                _buildDietPlannerSummaryCard(),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -3598,6 +3603,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _buildCalorieCard(
                   progress: calorieProgress,
                   remaining: calorieRemaining,
+                  showDetails: true,
                 ),
                 const SizedBox(height: 14),
                 _buildProgressCard(),
@@ -3929,8 +3935,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: _buildBottomNavItem(
                 icon: Icons.person_rounded,
                 label: _t('Perfil', 'Profile'),
-                active: _activeSection == 3,
-                onTap: () => setState(() => _activeSection = 3),
+                active: false,
+                onTap: () {
+                  _lastSectionBeforeProfile = _activeSection.clamp(0, 2);
+                  _openMeasurements();
+                },
               ),
             ),
           ],
@@ -4355,6 +4364,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildCalorieCard({
     required double progress,
     required double remaining,
+    bool showDetails = false,
   }) {
     final consumedCalories = _todayTotals.calories;
     final goalCalories = _calorieGoal;
@@ -4369,10 +4379,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final redLineProgress =
         hasOverconsumed ? math.max(overProgress, 0.06) : 0.0;
     final visualProgress = hasOverconsumed ? 1.0 : progress;
+    final ringSize = showDetails ? 120.0 : 108.0;
+    final consumedFontSize = showDetails ? 24.0 : 20.0;
+    final unitFontSize = showDetails ? 13.0 : 11.0;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(26),
@@ -4390,7 +4403,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Row(
             children: [
               Text(
-                _t('Resumen de calorías', 'Calorie summary'),
+                showDetails
+                    ? _t('Resumen de calorías', 'Calorie summary')
+                    : _t('Resumen', 'Summary'),
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -4418,92 +4433,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
             ],
           ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: 168,
-            height: 168,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const SizedBox.expand(
-                  child: CircularProgressIndicator(
-                    value: 1,
-                    strokeWidth: 16,
-                    color: Color(0xFFE4EFE7),
+            const SizedBox(height: 14),
+          Center(
+            child: SizedBox(
+              width: ringSize,
+              height: ringSize,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const SizedBox.expand(
+                    child: CircularProgressIndicator(
+                      value: 1,
+                      strokeWidth: 16,
+                      color: Color(0xFFE4EFE7),
+                    ),
                   ),
-                ),
-                SizedBox.expand(
-                  child: CircularProgressIndicator(
-                    value: visualProgress,
-                    strokeWidth: 16,
-                    strokeCap: StrokeCap.round,
-                    color: const Color(0xFF2E8A5E),
-                    backgroundColor: Colors.transparent,
-                  ),
-                ),
-                if (hasOverconsumed)
                   SizedBox.expand(
                     child: CircularProgressIndicator(
-                      value: redLineProgress,
+                      value: visualProgress,
                       strokeWidth: 16,
                       strokeCap: StrokeCap.round,
-                      color: const Color(0xFFFF2D2D),
+                      color: const Color(0xFF2E8A5E),
                       backgroundColor: Colors.transparent,
                     ),
                   ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      consumedKcal.toString(),
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: hasOverconsumed
-                            ? const Color(0xFFFF2D2D)
-                            : const Color(0xFF2E7D52),
+                  if (hasOverconsumed)
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: redLineProgress,
+                        strokeWidth: 16,
+                        strokeCap: StrokeCap.round,
+                        color: const Color(0xFFFF2D2D),
+                        backgroundColor: Colors.transparent,
                       ),
                     ),
-                    const Text(
-                      'KCAL',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                        color: Color(0xFF7A9685),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        consumedKcal.toString(),
+                        style: TextStyle(
+                          fontSize: consumedFontSize,
+                          fontWeight: FontWeight.w900,
+                          color: hasOverconsumed
+                              ? const Color(0xFFFF2D2D)
+                              : const Color(0xFF2E7D52),
+                        ),
                       ),
-                    ),
-                  ],
+                      Text(
+                        'KCAL',
+                        style: TextStyle(
+                          fontSize: unitFontSize,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                          color: const Color(0xFF7A9685),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+          ),
+          ),
+          if (showDetails) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatBlock(
+                    _t('Meta', 'Goal'),
+                    '$goalKcal kcal',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatBlock(
+                    hasOverconsumed
+                        ? _t('Exceso', 'Over target')
+                        : _t('Restante', 'Remaining'),
+                    hasOverconsumed
+                        ? '+$overCaloriesInt kcal'
+                        : '${remaining.toStringAsFixed(0)} kcal',
+                    valueColor: hasOverconsumed
+                        ? const Color(0xFFFF2D2D)
+                        : const Color(0xFF2E8A5E),
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatBlock(
-                  _t('Meta', 'Goal'),
-                  '$goalKcal kcal',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatBlock(
-                  hasOverconsumed
-                      ? _t('Exceso', 'Over target')
-                      : _t('Restante', 'Remaining'),
-                  hasOverconsumed
-                      ? '+$overCaloriesInt kcal'
-                      : '${remaining.toStringAsFixed(0)} kcal',
-                  valueColor: hasOverconsumed
-                      ? const Color(0xFFFF2D2D)
-                      : const Color(0xFF2E8A5E),
-                ),
-              ),
-            ],
-          ),
-          if (hasOverconsumed) ...[
+          ] else if (hasOverconsumed) ...[
             const SizedBox(height: 10),
             Row(
               children: [
@@ -4639,6 +4657,116 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ] else
             const SizedBox(height: 18),
           _buildWaterTrackerCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHomeMacroSummaryCard() {
+    final macros = [
+      (
+        label: _t('Proteína', 'Protein'),
+        current: _todayTotals.protein,
+        target: _profile?.proteinTarget ?? (_calorieGoal * 0.3 / 4),
+        color: const Color(0xFF3C9A73),
+      ),
+      (
+        label: _t('Carbos', 'Carbs'),
+        current: _todayTotals.carbs,
+        target: math.max(1.0, (_calorieGoal - (_profile?.proteinTarget ?? 0) * 4 - (_profile?.fatTarget ?? 0) * 9) / 4),
+        color: const Color(0xFFD4A44D),
+      ),
+      (
+        label: _t('Grasas', 'Fat'),
+        current: _todayTotals.fat,
+        target: _profile?.fatTarget ?? (_calorieGoal * 0.3 / 9),
+        color: const Color(0xFF8F6BD6),
+      ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE1ECE3)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x122E8A5E),
+            blurRadius: 26,
+            offset: Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'MACROS DEL DÍA',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
+              color: Color(0xFF5E8570),
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...macros.map((macro) {
+            final safeTarget = macro.target > 0 ? macro.target : 1;
+            final percent = (macro.current / safeTarget).clamp(0.0, 1.0).toDouble();
+            final valueText = '${macro.current.toStringAsFixed(0)}/${safeTarget.toStringAsFixed(0)}${macro.label == _t('Proteína', 'Protein') ? 'g' : 'g'}';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          macro.label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: macro.color,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        valueText,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF7A9685),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: Container(
+                      height: 8,
+                      color: const Color(0xFFE8F1E8),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: percent,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [macro.color.withValues(alpha: 0.85), macro.color],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

@@ -951,10 +951,8 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
 
       if (!mounted) return;
       shouldResetSaving = false;
-      final nav = Navigator.of(context);
-      if (nav.canPop()) {
-        nav.pop(true);
-      }
+      setState(() => _saving = false);
+      Navigator.of(context).pop(true);
       return;
     } catch (e) {
       if (!mounted) return;
@@ -1280,6 +1278,10 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF7FBF7),
         appBar: AppBar(
+          leading: IconButton(
+            onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
           title: const Text('Mis medidas'),
           backgroundColor: Colors.transparent,
           foregroundColor: const Color(0xFF2e7d52),
