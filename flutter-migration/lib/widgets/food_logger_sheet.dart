@@ -183,350 +183,326 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scheme = Theme.of(context).colorScheme;
-    final borderColor = isDark ? const Color(0xFF4AA372) : const Color(0xFFDCEBDD);
-    final textColor = isDark ? Colors.white : const Color(0xFF234734);
-    final fillColor = isDark ? const Color(0xFF2F4538) : const Color(0xFFF0F7F3);
-    final labelColor = isDark ? Colors.white : const Color(0xFF3D614D);
-    final sheetColor = isDark ? const Color(0xFF18241E) : const Color(0xFFDCEBDD);
-    return Container(
-      color: sheetColor,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            12,
-            16,
-            14 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Align(
-                alignment: Alignment.center,
-                child: Container(
-                  width: 46,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF355244) : const Color(0xFFD2E4D7),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          14 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Align(
+              alignment: Alignment.center,
+              child: Container(
+                width: 46,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Color(0xFFD2E4D7),
+                  borderRadius: BorderRadius.circular(99),
                 ),
               ),
-              SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Registrar comida de hoy',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: textColor,
-                      ),
+            ),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Registrar comida de hoy',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF234734),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    icon: Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              TextField(
-                controller: _searchCtrl,
-                focusNode: _searchFocus,
-                onChanged: _handleSearchChange,
-                textInputAction: TextInputAction.search,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: 'Buscar alimento',
-                  labelStyle: TextStyle(color: labelColor, fontWeight: FontWeight.w600),
-                  hintText: 'Ejemplo: lentejas, tofu, aguacate...',
-                  hintStyle: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF6A8D76)),
-                  prefixIcon: Icon(Icons.search_rounded, color: isDark ? Colors.white70 : const Color(0xFF5C846D)),
-                  filled: true,
-                  fillColor: fillColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: borderColor, width: 1.5),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: borderColor, width: 1.5),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: isDark ? const Color(0xFF5FB487) : const Color(0xFF4AA372), width: 2),
                   ),
                 ),
-              ),
-              SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _mealTime,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Momento',
-                        labelStyle: TextStyle(color: labelColor, fontWeight: FontWeight.w600),
-                        filled: true,
-                        fillColor: fillColor,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: borderColor, width: 1.5),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: borderColor, width: 1.5),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: isDark ? const Color(0xFF5FB487) : const Color(0xFF4AA372), width: 2),
-                        ),
-                        iconColor: isDark ? Colors.white70 : const Color(0xFF5C846D),
-                      ),
-                      dropdownColor: isDark ? const Color(0xFF1E2A23) : const Color(0xFFF0F7F3),
-                      items: _mealOptions
-                          .map(
-                            (meal) => DropdownMenuItem(
-                              value: meal,
-                              child: Text(meal, style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _mealTime = value);
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  SizedBox(
-                    width: 120,
-                    child: TextField(
-                      controller: _quantityCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        labelText: 'Cantidad',
-                        labelStyle: TextStyle(color: labelColor, fontWeight: FontWeight.w600),
-                        hintText: '100',
-                        hintStyle: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF6A8D76)),
-                        suffixText: 'g/ml',
-                        suffixStyle: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF5C846D), fontSize: 12),
-                        filled: true,
-                        fillColor: fillColor,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: borderColor, width: 1.5),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: borderColor, width: 1.5),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: isDark ? const Color(0xFF5FB487) : const Color(0xFF4AA372), width: 2),
-                        ),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                ],
-              ),
-              if (_selectedFoods.isNotEmpty) ...[
-                SizedBox(height: 12),
-                Text(
-                  'Seleccionados (${_selectedFoods.length})',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                    color: isDark ? Colors.white70 : const Color(0xFF5E8570),
-                  ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  icon: Icon(Icons.close_rounded),
                 ),
-                SizedBox(height: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _selectedFoods.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final item = _selectedFoods[index];
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF2A3E35) : const Color(0xFFEAF8EF),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isDark ? const Color(0xFF4AA372) : const Color(0xFF86C8A0)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(item.food.emoji, style: const TextStyle(fontSize: 18)),
-                            const SizedBox(width: 6),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.food.name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
-                                    color: isDark ? Colors.white : const Color(0xFF254836),
-                                  ),
-                                ),
-                                Text(
-                                  '${item.quantity.toInt()}g',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: isDark ? Colors.white70 : const Color(0xFF6A8D76),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            IconButton(
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF2E8A5E)),
-                              onPressed: () => setState(() => _selectedFoods.removeAt(index)),
-                            ),
-                          ],
-                        ),
-                      );
+              ],
+            ),
+            SizedBox(height: 8),
+            TextField(
+              controller: _searchCtrl,
+              focusNode: _searchFocus,
+              onChanged: _handleSearchChange,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                labelText: 'Buscar alimento',
+                hintText: 'Ejemplo: lentejas, tofu, aguacate...',
+                prefixIcon: Icon(Icons.search_rounded),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: Color(0xFFDCEBDD)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: Color(0xFFDCEBDD)),
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _mealTime,
+                    decoration: InputDecoration(
+                      labelText: 'Momento',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Color(0xFFDCEBDD)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Color(0xFFDCEBDD)),
+                      ),
+                    ),
+                    items: _mealOptions
+                        .map(
+                          (meal) => DropdownMenuItem(
+                            value: meal,
+                            child: Text(meal),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _mealTime = value);
                     },
                   ),
                 ),
+                SizedBox(width: 10),
+                SizedBox(
+                  width: 120,
+                  child: TextField(
+                    controller: _quantityCtrl,
+                    keyboardType:
+                        TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Cantidad',
+                      hintText: '100',
+                      suffixText: 'g/ml',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Color(0xFFDCEBDD)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Color(0xFFDCEBDD)),
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
               ],
+            ),
+            if (_selectedFoods.isNotEmpty) ...[
               SizedBox(height: 12),
               Text(
-                'Resultados',
+                'Seleccionados (${_selectedFoods.length})',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.6,
-                  color: isDark ? Colors.white70 : const Color(0xFF5E8570),
+                  color: Color(0xFF5E8570),
                 ),
               ),
               SizedBox(height: 8),
-              SizedBox(
-                height: 210,
-                child: _searching
-                    ? const Center(child: CircularProgressIndicator())
-                    : _results.isEmpty
-                        ? Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: fillColor,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Text(
-                              'No se encontraron alimentos. Prueba otro nombre.',
-                              style: TextStyle(
-                                color: isDark ? Colors.white70 : const Color(0xFF6A8D76),
-                                fontSize: 13,
-                              ),
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: _results.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final food = _results[index];
-                              return InkWell(
-                                onTap: () {
-                                  final qty = _parseQuantity() ?? 100;
-                                  if (qty <= 0) return;
-                                  setState(() {
-                                    _selectedFoods.add((food: food, quantity: qty));
-                                  });
-                                },
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: fillColor,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: borderColor),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Text(food.emoji, style: const TextStyle(fontSize: 24)),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              food.name,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                color: isDark ? Colors.white : const Color(0xFF2A4B38),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              '${food.calories.toInt()} kcal/100g • P ${food.protein.toStringAsFixed(1)} • C ${food.carbs.toStringAsFixed(1)} • G ${food.fat.toStringAsFixed(1)}',
-                                              style: TextStyle(
-                                                fontSize: 11.5,
-                                                color: isDark ? Colors.white70 : const Color(0xFF6A8D76),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons.add_circle_outline_rounded,
-                                        color: Color(0xFF2E8A5E),
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: 120),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedFoods.length,
+                  separatorBuilder: (_, __) => SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final item = _selectedFoods[index];
+                    return Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Color(0xFFEAF8EF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Color(0xFF86C8A0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(item.food.emoji, style: TextStyle(fontSize: 18)),
+                          SizedBox(width: 6),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.food.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Color(0xFF254836),
                                 ),
-                              );
-                            },
+                              ),
+                              Text(
+                                '${item.quantity.toInt()}g',
+                                style: TextStyle(
+                                    fontSize: 10, color: Color(0xFF6A8D76)),
+                              ),
+                            ],
                           ),
-              ),
-              SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _saving ? null : _saveFood,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.bookmark_add_rounded),
-                  label: Text(
-                    _saving
-                        ? 'Guardando...'
-                        : (_selectedFoods.isEmpty
-                            ? 'Selecciona alimentos'
-                            : 'Guardar ${_selectedFoods.length} items en hoy'),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E8A5E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
+                          SizedBox(width: 4),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(),
+                            icon: Icon(Icons.close_rounded,
+                                size: 16, color: Color(0xFF2E8A5E)),
+                            onPressed: () =>
+                                setState(() => _selectedFoods.removeAt(index)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
-          ),
+            SizedBox(height: 12),
+            Text(
+              'Resultados',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: Color(0xFF5E8570),
+              ),
+            ),
+            SizedBox(height: 8),
+            SizedBox(
+              height: 210,
+              child: _searching
+                  ? Center(child: CircularProgressIndicator())
+                  : _results.isEmpty
+                      ? Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Color(0xFFDCEBDD)),
+                          ),
+                          child: Text(
+                            'No se encontraron alimentos. Prueba otro nombre.',
+                            style: TextStyle(
+                              color: Color(0xFF6A8D76),
+                              fontSize: 13,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _results.length,
+                          separatorBuilder: (_, __) => SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final food = _results[index];
+                            return InkWell(
+                              onTap: () {
+                                final qty = _parseQuantity() ?? 100;
+                                if (qty <= 0) return;
+                                setState(() {
+                                  _selectedFoods
+                                      .add((food: food, quantity: qty));
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: Color(0xFFDCEBDD),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(food.emoji,
+                                        style: TextStyle(fontSize: 24)),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            food.name,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF2A4B38),
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            '${food.calories.toInt()} kcal/100g • P ${food.protein.toStringAsFixed(1)} • C ${food.carbs.toStringAsFixed(1)} • G ${food.fat.toStringAsFixed(1)}',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              color: Color(0xFF6A8D76),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.add_circle_outline_rounded,
+                                      color: Color(0xFF2E8A5E),
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+            SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _saving ? null : _saveFood,
+                icon: _saving
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(Icons.bookmark_add_rounded),
+                label: Text(
+                  _saving
+                      ? 'Guardando...'
+                      : (_selectedFoods.isEmpty
+                          ? 'Selecciona alimentos'
+                          : 'Guardar ${_selectedFoods.length} items en hoy'),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF2E8A5E),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
