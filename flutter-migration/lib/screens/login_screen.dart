@@ -155,7 +155,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final result = await Navigator.of(context).push<dynamic>(
         MaterialPageRoute(
-          builder: (_) => ProfileMeasurementsScreen(repository: scopedRepo),
+          builder: (_) => ProfileMeasurementsScreen(
+            repository: scopedRepo,
+            locale: _currentLocale,
+          ),
         ),
       );
 
@@ -379,7 +382,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final result = await Navigator.of(context).push<dynamic>(
         MaterialPageRoute(
-          builder: (_) => ProfileMeasurementsScreen(repository: scopedRepo),
+          builder: (_) => ProfileMeasurementsScreen(
+            repository: scopedRepo,
+            locale: _currentLocale,
+          ),
         ),
       );
 

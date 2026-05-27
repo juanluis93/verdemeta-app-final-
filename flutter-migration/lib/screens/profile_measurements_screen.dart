@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/food_models.dart';
 import '../repositories/food_repository.dart';
+import '../services/food_name_translator.dart';
 
 class _BodyCompEstimate {
   final double bmi;
@@ -57,10 +58,12 @@ class _BodyCompEstimate {
 
 class ProfileMeasurementsScreen extends StatefulWidget {
   final FoodRepository repository;
+  final Locale locale;
 
   const ProfileMeasurementsScreen({
     super.key,
     required this.repository,
+    required this.locale,
   });
 
   @override
@@ -93,6 +96,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   final _armCtrl = TextEditingController();
   final _calfCtrl = TextEditingController();
 
+  late Locale _currentLocale;
   String _gender = 'female';
   String _goal = 'health';
   double _activity = 1.55;
@@ -101,6 +105,58 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   Set<int> _selectedConditionIds = <int>{};
   List<Food> _availableFoods = const [];
   Set<int> _selectedUndesiredFoodIds = <int>{};
+
+    bool get _isSpanish => _currentLocale.languageCode == 'es';
+
+    bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
+    Color get _accent =>
+      _isDark ? const Color(0xFF7AD9A5) : const Color(0xFF2e7d52);
+
+    Color get _accentStrong =>
+      _isDark ? const Color(0xFF6CCF97) : const Color(0xFF2F7F53);
+
+    Color get _labelColor =>
+      _isDark ? const Color(0xFFB5C7BC) : const Color(0xFF5C846D);
+
+    Color get _textPrimary =>
+      _isDark ? const Color(0xFFE6F3EA) : const Color(0xFF345646);
+
+    Color get _textSecondary =>
+      _isDark ? const Color(0xFF9DB2A6) : const Color(0xFF5E8570);
+
+    Color get _hintColor =>
+      _isDark ? const Color(0xFF7E9387) : const Color(0xFFA5B9AB);
+
+    Color get _inputFill =>
+      _isDark ? const Color(0xFF1B2A22) : const Color(0xFFF2F8F0);
+
+    Color get _inputBorder =>
+      _isDark ? const Color(0xFF2E4036) : const Color(0xFFCFE1D3);
+
+    Color get _inputFocused =>
+      _isDark ? const Color(0xFF7AD9A5) : const Color(0xFF8DB69A);
+
+    Color get _surface =>
+      _isDark ? const Color(0xFF1B2A22) : const Color(0xFFFEFFFD);
+
+    Color get _surfaceBorder =>
+      _isDark ? const Color(0xFF2B3C31) : const Color(0xFFDDEBDD);
+
+    Color get _chipBackground =>
+      _isDark ? const Color(0xFF223229) : const Color(0x142E7D52);
+
+    Color get _chipBorder =>
+      _isDark ? const Color(0xFF2F4538) : const Color(0x332e7d52);
+
+    Color get _sheetBackground =>
+      _isDark ? const Color(0xFF1B2A22) : const Color(0xFFF9FCF8);
+
+  String _t(String es, String en) => _isSpanish ? es : en;
+
+  String _foodName(String name) {
+    return FoodNameTranslator.translate(name, _currentLocale);
+  }
 
   String _safeGender(String value) {
     return _genderOptions.contains(value) ? value : 'female';
@@ -125,8 +181,17 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   @override
   void initState() {
     super.initState();
+    _currentLocale = widget.locale;
     _loadProfile();
     _loadUndesiredFoods();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileMeasurementsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.locale != widget.locale) {
+      setState(() => _currentLocale = widget.locale);
+    }
   }
 
   @override
@@ -204,8 +269,13 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   Future<void> _pickConditions() async {
     if (_availableConditions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No hay enfermedades disponibles en la base de datos.'),
+        SnackBar(
+          content: Text(
+            _t(
+              'No hay enfermedades disponibles en la base de datos.',
+              'No health conditions are available in the database.',
+            ),
+          ),
         ),
       );
       return;
@@ -216,7 +286,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFFF9FCF8),
+      backgroundColor: _sheetBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -230,12 +300,12 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Selecciona enfermedades',
+                    Text(
+                      _t('Selecciona enfermedades', 'Select conditions'),
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF2F7F53),
+                        color: _accentStrong,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -249,7 +319,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                           return CheckboxListTile(
                             dense: true,
                             value: selected,
-                            activeColor: const Color(0xFF2e7d52),
+                            activeColor: _accent,
                             title: Text(condition.nombre),
                             subtitle: Text(
                               condition.descripcion,
@@ -279,10 +349,12 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                           Navigator.of(sheetContext).pop();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2e7d52),
+                          backgroundColor: _accent,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Aplicar selección'),
+                        child: Text(
+                          _t('Aplicar selección', 'Apply selection'),
+                        ),
                       ),
                     ),
                   ],
@@ -298,8 +370,13 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   Future<void> _pickUndesiredFoods() async {
     if (_availableFoods.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No hay alimentos disponibles en la base de datos.'),
+        SnackBar(
+          content: Text(
+            _t(
+              'No hay alimentos disponibles en la base de datos.',
+              'No foods are available in the database.',
+            ),
+          ),
         ),
       );
       return;
@@ -312,7 +389,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFFF9FCF8),
+      backgroundColor: _sheetBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -326,12 +403,12 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Alimentos no deseados',
+                    Text(
+                      _t('Alimentos no deseados', 'Undesired foods'),
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF2F7F53),
+                        color: _accentStrong,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -349,8 +426,8 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                           return CheckboxListTile(
                             dense: true,
                             value: selected,
-                            activeColor: const Color(0xFF2e7d52),
-                            title: Text('${food.emoji} ${food.name}'),
+                            activeColor: _accent,
+                            title: Text('${food.emoji} ${_foodName(food.name)}'),
                             onChanged: (value) {
                               setLocalState(() {
                                 if (value == true) {
@@ -375,10 +452,12 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                           Navigator.of(sheetContext).pop();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2e7d52),
+                          backgroundColor: _accent,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('Aplicar seleccion'),
+                        child: Text(
+                          _t('Aplicar seleccion', 'Apply selection'),
+                        ),
                       ),
                     ),
                   ],
@@ -430,28 +509,28 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   double _round2(double value) => double.parse(value.toStringAsFixed(2));
 
   String _bmiCategory(double bmi) {
-    if (bmi < 18.5) return 'Bajo peso';
-    if (bmi < 25.0) return 'Normopeso';
-    if (bmi < 30.0) return 'Sobrepeso';
-    if (bmi < 35.0) return 'Obesidad grado I';
-    if (bmi < 40.0) return 'Obesidad grado II';
-    return 'Obesidad morbida';
+    if (bmi < 18.5) return _t('Bajo peso', 'Underweight');
+    if (bmi < 25.0) return _t('Normopeso', 'Normal weight');
+    if (bmi < 30.0) return _t('Sobrepeso', 'Overweight');
+    if (bmi < 35.0) return _t('Obesidad grado I', 'Obesity class I');
+    if (bmi < 40.0) return _t('Obesidad grado II', 'Obesity class II');
+    return _t('Obesidad morbida', 'Severe obesity');
   }
 
   String _fatCategory(double fatPct, String gender) {
     if (gender == 'female') {
-      if (fatPct < 14) return 'Atleta elite';
-      if (fatPct < 21) return 'Atleta';
-      if (fatPct < 25) return 'En forma';
-      if (fatPct < 32) return 'Aceptable';
-      return 'Sobrepeso graso';
+      if (fatPct < 14) return _t('Atleta elite', 'Elite athlete');
+      if (fatPct < 21) return _t('Atleta', 'Athlete');
+      if (fatPct < 25) return _t('En forma', 'Fit');
+      if (fatPct < 32) return _t('Aceptable', 'Acceptable');
+      return _t('Sobrepeso graso', 'High body fat');
     }
 
-    if (fatPct < 6) return 'Atleta elite';
-    if (fatPct < 14) return 'Atleta';
-    if (fatPct < 18) return 'En forma';
-    if (fatPct < 25) return 'Aceptable';
-    return 'Sobrepeso graso';
+    if (fatPct < 6) return _t('Atleta elite', 'Elite athlete');
+    if (fatPct < 14) return _t('Atleta', 'Athlete');
+    if (fatPct < 18) return _t('En forma', 'Fit');
+    if (fatPct < 25) return _t('Aceptable', 'Acceptable');
+    return _t('Sobrepeso graso', 'High body fat');
   }
 
   String _resolveBodyCategory({
@@ -459,15 +538,17 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     required String bmiCategory,
     required String fatCategory,
   }) {
+    final elite = _t('Atleta elite', 'Elite athlete');
+    final athlete = _t('Atleta', 'Athlete');
+    final fit = _t('En forma', 'Fit');
+    final overweight = _t('Sobrepeso', 'Overweight');
     // Safety guard: obesity by BMI should never be reported as athlete.
     if (bmi >= 30.0) return bmiCategory;
 
     // Avoid fitness labels when BMI already indicates overweight.
     if (bmi >= 25.0 &&
-        (fatCategory == 'Atleta elite' ||
-            fatCategory == 'Atleta' ||
-            fatCategory == 'En forma')) {
-      return 'Sobrepeso';
+        (fatCategory == elite || fatCategory == athlete || fatCategory == fit)) {
+      return overweight;
     }
 
     return fatCategory;
@@ -614,33 +695,42 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     final modelCount = smmModels.length;
     final precision = switch (modelCount) {
       1 => (
-          label: 'Estimacion basica',
+          label: _t('Estimacion basica', 'Basic estimate'),
           error: '±15%',
-          hint: 'Agrega brazo y pantorrilla para mejorar precision',
+          hint: _t(
+            'Agrega brazo y pantorrilla para mejorar precision',
+            'Add arm and calf to improve precision',
+          ),
         ),
       2 => (
-          label: 'Estimacion moderada',
+          label: _t('Estimacion moderada', 'Moderate estimate'),
           error: '±9%',
-          hint: 'Agrega la otra medida para mejorar precision',
+          hint: _t(
+            'Agrega la otra medida para mejorar precision',
+            'Add the other measurement to improve precision',
+          ),
         ),
       _ => (
-          label: 'Estimacion avanzada',
+          label: _t('Estimacion avanzada', 'Advanced estimate'),
           error: '±6%',
-          hint: 'Alta confianza con multiples medidas',
+          hint: _t(
+            'Alta confianza con multiples medidas',
+            'High confidence with multiple measurements',
+          ),
         ),
     };
 
     final muscleCategory = gender == 'male'
         ? (smi < 7.0
-            ? 'Sarcopenia'
+        ? _t('Sarcopenia', 'Sarcopenia')
             : smi < 8.5
-                ? 'Normal'
-                : 'Optimo')
+          ? _t('Normal', 'Normal')
+          : _t('Optimo', 'Optimal'))
         : (smi < 5.7
-            ? 'Sarcopenia'
+        ? _t('Sarcopenia', 'Sarcopenia')
             : smi < 6.8
-                ? 'Normal'
-                : 'Optimo');
+          ? _t('Normal', 'Normal')
+          : _t('Optimo', 'Optimal'));
 
     final refH = gender == 'female' ? 163.0 : 175.0;
     final boneK = gender == 'female' ? 0.038 : 0.045;
@@ -652,12 +742,12 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     final bonePct = _round1((boneKg / weight) * 100);
     final boneRef = gender == 'female' ? 2.8 : 3.8;
     final boneCategory = boneKg >= boneRef * 1.1
-        ? 'Densidad alta'
+      ? _t('Densidad alta', 'High density')
         : boneKg >= boneRef * 0.9
-            ? 'Densidad normal'
+        ? _t('Densidad normal', 'Normal density')
             : boneKg >= boneRef * 0.75
-                ? 'Densidad baja'
-                : 'Densidad muy baja';
+          ? _t('Densidad baja', 'Low density')
+          : _t('Densidad muy baja', 'Very low density');
 
     var waterMass = gender == 'female'
         ? -2.097 + 0.1069 * safeHeightCm + 0.2466 * weight
@@ -668,10 +758,10 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     final waterEC = _round1(waterMass * 0.33);
     final normalWaterRange = gender == 'female' ? (45.0, 60.0) : (50.0, 65.0);
     final waterStatus = waterPct < normalWaterRange.$1
-        ? 'Bajo rango'
-        : waterPct <= normalWaterRange.$2
-            ? 'Normal'
-            : 'Posible retencion';
+      ? _t('Bajo rango', 'Low range')
+      : waterPct <= normalWaterRange.$2
+        ? _t('Normal', 'Normal')
+        : _t('Posible retencion', 'Possible retention');
 
     final bmiCategory = _bmiCategory(bmi);
     final fatCategory = _fatCategory(fatPct, gender);
@@ -856,9 +946,12 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
 
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Completa los campos requeridos: nombre, edad, peso y altura.',
+            _t(
+              'Completa los campos requeridos: nombre, edad, peso y altura.',
+              'Complete the required fields: name, age, weight, and height.',
+            ),
           ),
         ),
       );
@@ -867,9 +960,12 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
 
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'En web es solo vista previa. Puedes ver estimaciones aqui, pero para guardar medidas usa Android o escritorio.',
+            _t(
+              'En web es solo vista previa. Puedes ver estimaciones aqui, pero para guardar medidas usa Android o escritorio.',
+              'On web this is preview only. You can see estimates here, but to save measurements use Android or desktop.',
+            ),
           ),
         ),
       );
@@ -957,11 +1053,13 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      var errorText = 'No se pudo guardar: $e';
+      var errorText = _t('No se pudo guardar: $e', 'Could not save: $e');
       final raw = e.toString().toLowerCase();
       if (raw.contains('databasefactory not initialized')) {
-        errorText =
-            'No se pudo iniciar la base de datos local. Reinicia la app y vuelve a intentar.';
+        errorText = _t(
+          'No se pudo iniciar la base de datos local. Reinicia la app y vuelve a intentar.',
+          'Local database failed to initialize. Restart the app and try again.',
+        );
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -989,11 +1087,11 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
-              color: Color(0xFF5C846D),
+              color: _labelColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -1002,9 +1100,9 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
             keyboardType: keyboardType,
             validator: validator,
             onChanged: onChanged ?? (_) => setState(() {}),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: Color(0xFF345646),
+              color: _textPrimary,
             ),
             decoration: _mobileInputDecoration(hint: hint),
           ),
@@ -1018,19 +1116,19 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
       hintText: hint,
       isDense: true,
       filled: true,
-      fillColor: const Color(0xFFF2F8F0),
+      fillColor: _inputFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      hintStyle: const TextStyle(
-        color: Color(0xFFA5B9AB),
+      hintStyle: TextStyle(
+        color: _hintColor,
         fontSize: 16,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFCFE1D3)),
+        borderSide: BorderSide(color: _inputBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFF8DB69A), width: 1.4),
+        borderSide: BorderSide(color: _inputFocused, width: 1.4),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -1056,11 +1154,11 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
-              color: Color(0xFF5C846D),
+              color: _labelColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -1071,12 +1169,13 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
               setState(() => onChanged(v));
             },
             decoration: _mobileInputDecoration(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: Color(0xFF345646),
+              color: _textPrimary,
             ),
-            dropdownColor: const Color(0xFFF8FCF8),
-            iconEnabledColor: const Color(0xFF5C846D),
+            dropdownColor:
+                _isDark ? const Color(0xFF18251F) : const Color(0xFFF8FCF8),
+            iconEnabledColor: _labelColor,
           ),
         ],
       ),
@@ -1110,15 +1209,19 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     Color color = const Color(0xFF1F5E3D),
     bool highlighted = false,
   }) {
+    final bg = highlighted
+        ? _accent.withOpacity(_isDark ? 0.22 : 0.12)
+        : (_isDark ? const Color(0xFF1C2C23) : Colors.white);
+    final border = highlighted
+        ? _accent.withOpacity(_isDark ? 0.35 : 0.25)
+        : (_isDark ? const Color(0xFF2E4036) : const Color(0xFFE2E8E4));
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: highlighted ? const Color(0x192e7d52) : Colors.white,
+        color: bg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color:
-              highlighted ? const Color(0x552e7d52) : const Color(0xFFE2E8E4),
-        ),
+        border: Border.all(color: border),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1135,9 +1238,9 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
-              color: Color(0xFF4F6F5E),
+              color: _isDark ? const Color(0xFF9DB2A6) : const Color(0xFF4F6F5E),
               height: 1.2,
             ),
             textAlign: TextAlign.center,
@@ -1148,19 +1251,20 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   }
 
   Widget _statusPill(String text, {Color bg = const Color(0x142e7d52)}) {
+    final bgColor = _isDark ? const Color(0xFF223229) : bg;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: bg,
+        color: bgColor,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0x332e7d52)),
+        border: Border.all(color: _chipBorder),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF1F5E3D),
+          color: _isDark ? const Color(0xFFBFE7D2) : const Color(0xFF1F5E3D),
         ),
       ),
     );
@@ -1213,6 +1317,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _isDark;
     final selectedGender = _safeGender(_gender);
     final selectedGoal = _safeGoal(_goal);
     final selectedActivity = _safeActivity(_activity);
@@ -1276,26 +1381,33 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7FBF7),
+        backgroundColor:
+            isDark ? const Color(0xFF0F1914) : const Color(0xFFF7FBF7),
         appBar: AppBar(
           leading: IconButton(
             onPressed: _saving ? null : () => Navigator.of(context).pop(false),
             icon: const Icon(Icons.arrow_back_rounded),
           ),
-          title: const Text('Mis medidas'),
+          title: Text(_t('Mis medidas', 'My measurements')),
           backgroundColor: Colors.transparent,
-          foregroundColor: const Color(0xFF2e7d52),
+          foregroundColor: _accent,
           elevation: 0,
           scrolledUnderElevation: 0,
         ),
         body: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFFF9FCF8),
-                Color(0xFFF2FAF4),
-                Color(0xFFE8F8F1),
-              ],
+              colors: isDark
+                  ? const [
+                      Color(0xFF0F1914),
+                      Color(0xFF11241A),
+                      Color(0xFF14291D),
+                    ]
+                  : const [
+                      Color(0xFFF9FCF8),
+                      Color(0xFFF2FAF4),
+                      Color(0xFFE8F8F1),
+                    ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -1313,127 +1425,135 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                       Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEFFFD),
+                          color: _surface,
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFDDEBDD)),
-                          boxShadow: const [
+                          border: Border.all(color: _surfaceBorder),
+                          boxShadow: [
                             BoxShadow(
-                              color: Color(0x142e7d52),
+                              color: isDark
+                                  ? const Color(0x1A000000)
+                                  : const Color(0x142e7d52),
                               blurRadius: 28,
-                              offset: Offset(0, 14),
+                              offset: const Offset(0, 14),
                             ),
                           ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              '¡Hola! Cuéntame sobre ti',
+                            Text(
+                              _t('¡Hola! Cuéntame sobre ti', 'Hi! Tell me about you'),
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF2F7F53),
+                                color: _accentStrong,
                                 height: 1.1,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
-                              'Estos datos me permiten calcular tus macros y composición corporal',
+                            Text(
+                              _t(
+                                'Estos datos me permiten calcular tus macros y composición corporal',
+                                'These details help me calculate your macros and body composition',
+                              ),
                               style: TextStyle(
                                 fontSize: 12.5,
-                                color: Color(0xFF5E8570),
+                                color: _textSecondary,
                                 height: 1.35,
                               ),
                             ),
                             const SizedBox(height: 22),
                             _field(
-                              'Tu nombre',
+                              _t('Tu nombre', 'Your name'),
                               _nameCtrl,
-                              hint: 'Ej: Juan',
+                              hint: _t('Ej: Juan', 'E.g. Alex'),
                               validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Requerido'
+                                  ? _t('Requerido', 'Required')
                                   : null,
                             ),
                             _fieldPair(
                               _field(
-                                'Edad',
+                                _t('Edad', 'Age'),
                                 _ageCtrl,
                                 keyboardType: TextInputType.number,
                                 validator: (v) {
                                   if (v == null || v.trim().isEmpty) {
-                                    return 'Requerido';
+                                    return _t('Requerido', 'Required');
                                   }
                                   final n = int.tryParse(v.trim());
                                   if (n == null || n < 10 || n > 100) {
-                                    return 'Edad invalida';
+                                    return _t('Edad invalida', 'Invalid age');
                                   }
                                   return null;
                                 },
                               ),
                               _dropdownField<String>(
-                                label: 'Género',
+                                label: _t('Género', 'Gender'),
                                 value: selectedGender,
-                                items: const [
+                                items: [
                                   DropdownMenuItem(
                                     value: 'female',
-                                    child: Text('Mujer'),
+                                    child: Text(_t('Mujer', 'Female')),
                                   ),
                                   DropdownMenuItem(
                                     value: 'male',
-                                    child: Text('Hombre'),
+                                    child: Text(_t('Hombre', 'Male')),
                                   ),
                                   DropdownMenuItem(
                                     value: 'other',
-                                    child: Text('Otro'),
+                                    child: Text(_t('Otro', 'Other')),
                                   ),
                                 ],
                                 onChanged: (v) =>
                                     _gender = _safeGender(v ?? 'female'),
                               ),
                             ),
-                            const Text(
-                              'Uso sexo biologico para ecuaciones fisiologicas (BMR, % grasa y objetivos de micronutrientes), por eso los resultados cambian entre mujer y hombre.',
+                            Text(
+                              _t(
+                                'Uso sexo biologico para ecuaciones fisiologicas (BMR, % grasa y objetivos de micronutrientes), por eso los resultados cambian entre mujer y hombre.',
+                                'I use biological sex for physiological equations (BMR, body fat %, and micronutrient targets), so results differ between women and men.',
+                              ),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFF5E8570),
+                                color: _textSecondary,
                                 height: 1.35,
                               ),
                             ),
                             const SizedBox(height: 8),
                             _fieldPair(
                               _field(
-                                'Peso (kg)',
+                                _t('Peso (kg)', 'Weight (kg)'),
                                 _weightCtrl,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                         decimal: true),
                                 validator: (v) {
                                   if (v == null || v.trim().isEmpty) {
-                                    return 'Requerido';
+                                    return _t('Requerido', 'Required');
                                   }
                                   final n =
                                       double.tryParse(v.replaceAll(',', '.'));
                                   if (n == null || n <= 0) {
-                                    return 'Valor invalido';
+                                    return _t('Valor invalido', 'Invalid value');
                                   }
                                   return null;
                                 },
                               ),
                               _field(
-                                'Altura (cm)',
+                                _t('Altura (cm)', 'Height (cm)'),
                                 _heightCtrl,
-                                hint: 'Ej: 170 o 1.70',
+                                hint: _t('Ej: 170 o 1.70', 'E.g. 170 or 1.70'),
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                         decimal: true),
                                 validator: (v) {
                                   if (v == null || v.trim().isEmpty) {
-                                    return 'Requerido';
+                                    return _t('Requerido', 'Required');
                                   }
                                   final n =
                                       double.tryParse(v.replaceAll(',', '.'));
                                   if (n == null || n <= 0) {
-                                    return 'Valor invalido';
+                                    return _t('Valor invalido', 'Invalid value');
                                   }
                                   return null;
                                 },
@@ -1443,43 +1563,54 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                               margin: const EdgeInsets.only(top: 6),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF3FBF2),
+                                color: isDark
+                                    ? const Color(0xFF1D2B23)
+                                    : const Color(0xFFF3FBF2),
                                 borderRadius: BorderRadius.circular(18),
-                                border:
-                                    Border.all(color: const Color(0xFFD3E6D6)),
+                                border: Border.all(
+                                  color: isDark
+                                      ? const Color(0xFF2F4538)
+                                      : const Color(0xFFD3E6D6),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    '📏 MEDIDAS PARA COMPOSICIÓN CORPORAL',
+                                  Text(
+                                    _t(
+                                      '📏 MEDIDAS PARA COMPOSICIÓN CORPORAL',
+                                      '📏 BODY COMPOSITION MEASUREMENTS',
+                                    ),
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: .8,
-                                      color: Color(0xFF2E8A5E),
+                                      color: _accentStrong,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  const Text(
-                                    'Mide en la parte más estrecha (cintura), más ancha (cadera/muslo) y a nivel de la nuez de Adán (cuello).',
+                                  Text(
+                                    _t(
+                                      'Mide en la parte más estrecha (cintura), más ancha (cadera/muslo) y a nivel de la nuez de Adán (cuello).',
+                                      'Measure at the narrowest point (waist), widest point (hip/thigh), and at the Adam\'s apple level (neck).',
+                                    ),
                                     style: TextStyle(
                                       fontSize: 11.5,
-                                      color: Color(0xFF64836F),
+                                      color: _textSecondary,
                                       height: 1.35,
                                     ),
                                   ),
                                   const SizedBox(height: 14),
                                   _fieldPair(
                                     _field(
-                                      'Cintura (cm)',
+                                      _t('Cintura (cm)', 'Waist (cm)'),
                                       _waistCtrl,
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
                                               decimal: true),
                                     ),
                                     _field(
-                                      'Cuello (cm)',
+                                      _t('Cuello (cm)', 'Neck (cm)'),
                                       _neckCtrl,
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
@@ -1490,15 +1621,15 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                     Opacity(
                                       opacity: _gender == 'male' ? 0.65 : 1,
                                       child: _field(
-                                        'Cadera (cm)',
+                                        _t('Cadera (cm)', 'Hip (cm)'),
                                         _hipCtrl,
-                                        hint: 'cm',
+                                        hint: _t('cm', 'cm'),
                                         keyboardType: const TextInputType
                                             .numberWithOptions(decimal: true),
                                       ),
                                     ),
                                     _field(
-                                      'Muslo (cm) (opcional)',
+                                      _t('Muslo (cm) (opcional)', 'Thigh (cm) (optional)'),
                                       _thighCtrl,
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
@@ -1507,14 +1638,14 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                   ),
                                   _fieldPair(
                                     _field(
-                                      'Brazo (cm) 💪 mejora precision',
+                                      _t('Brazo (cm) 💪 mejora precision', 'Arm (cm) 💪 improves precision'),
                                       _armCtrl,
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
                                               decimal: true),
                                     ),
                                     _field(
-                                      'Pantorrilla (cm) 🦵 mejora precision',
+                                      _t('Pantorrilla (cm) 🦵 mejora precision', 'Calf (cm) 🦵 improves precision'),
                                       _calfCtrl,
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
@@ -1522,11 +1653,14 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  const Text(
-                                    '📐 Brazo: mide en el punto más ancho del bíceps relajado. Pantorrilla: mide en el punto más ancho de la pantorrilla de pie.',
+                                  Text(
+                                    _t(
+                                      '📐 Brazo: mide en el punto más ancho del bíceps relajado. Pantorrilla: mide en el punto más ancho de la pantorrilla de pie.',
+                                      '📐 Arm: measure at the widest point of a relaxed biceps. Calf: measure at the widest point while standing.',
+                                    ),
                                     style: TextStyle(
                                       fontSize: 10.5,
-                                      color: Color(0xFF64836F),
+                                      color: _textSecondary,
                                       height: 1.35,
                                     ),
                                   ),
@@ -1535,52 +1669,52 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                             ),
                             const SizedBox(height: 8),
                             _dropdownField<String>(
-                              label: 'Objetivo',
+                              label: _t('Objetivo', 'Goal'),
                               value: selectedGoal,
-                              items: const [
+                              items: [
                                 DropdownMenuItem(
                                   value: 'deficit',
-                                  child: Text('Perder peso'),
+                                  child: Text(_t('Perder peso', 'Lose weight')),
                                 ),
                                 DropdownMenuItem(
                                   value: 'maintain',
-                                  child: Text('Mantener'),
+                                  child: Text(_t('Mantener', 'Maintain')),
                                 ),
                                 DropdownMenuItem(
                                   value: 'gain',
-                                  child: Text('Ganar musculo'),
+                                  child: Text(_t('Ganar musculo', 'Gain muscle')),
                                 ),
                                 DropdownMenuItem(
                                   value: 'health',
-                                  child: Text('Salud'),
+                                  child: Text(_t('Salud', 'Health')),
                                 ),
                               ],
                               onChanged: (v) =>
                                   _goal = _safeGoal(v ?? 'health'),
                             ),
                             _dropdownField<double>(
-                              label: 'Actividad',
+                              label: _t('Actividad', 'Activity'),
                               value: selectedActivity,
-                              items: const [
+                              items: [
                                 DropdownMenuItem(
                                   value: 1.2,
-                                  child: Text('Sedentario'),
+                                  child: Text(_t('Sedentario', 'Sedentary')),
                                 ),
                                 DropdownMenuItem(
                                   value: 1.375,
-                                  child: Text('Ligero'),
+                                  child: Text(_t('Ligero', 'Light')),
                                 ),
                                 DropdownMenuItem(
                                   value: 1.55,
-                                  child: Text('Moderado'),
+                                  child: Text(_t('Moderado', 'Moderate')),
                                 ),
                                 DropdownMenuItem(
                                   value: 1.725,
-                                  child: Text('Activo'),
+                                  child: Text(_t('Activo', 'Active')),
                                 ),
                                 DropdownMenuItem(
                                   value: 1.9,
-                                  child: Text('Muy activo'),
+                                  child: Text(_t('Muy activo', 'Very active')),
                                 ),
                               ],
                               onChanged: (v) =>
@@ -1591,13 +1725,13 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'ALIMENTOS NO DESEADOS',
+                                  Text(
+                                    _t('ALIMENTOS NO DESEADOS', 'UNDESIRED FOODS'),
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 1,
-                                      color: Color(0xFF5C846D),
+                                      color: _labelColor,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -1611,17 +1745,20 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                           Expanded(
                                             child: Text(
                                               _selectedUndesiredFoodIds.isEmpty
-                                                  ? 'Seleccionar alimentos'
-                                                  : '${_selectedUndesiredFoodIds.length} seleccionados',
-                                              style: const TextStyle(
+                                                  ? _t('Seleccionar alimentos', 'Select foods')
+                                                  : _t(
+                                                      '${_selectedUndesiredFoodIds.length} seleccionados',
+                                                      '${_selectedUndesiredFoodIds.length} selected',
+                                                    ),
+                                              style: TextStyle(
                                                 fontSize: 15,
-                                                color: Color(0xFF345646),
+                                                color: _textPrimary,
                                               ),
                                             ),
                                           ),
-                                          const Icon(
+                                          Icon(
                                             Icons.keyboard_arrow_down,
-                                            color: Color(0xFF5C846D),
+                                            color: _labelColor,
                                           ),
                                         ],
                                       ),
@@ -1639,22 +1776,21 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                                   food.id))
                                           .map(
                                             (food) => Chip(
-                                              label: Text(food.name),
-                                              backgroundColor:
-                                                  const Color(0x142E7D52),
+                                              label: Text(_foodName(food.name)),
+                                              backgroundColor: _chipBackground,
                                             ),
                                           )
                                           .toList(),
                                     ),
                                   ],
                                   const SizedBox(height: 12),
-                                  const Text(
-                                    'ENFERMEDADES',
+                                  Text(
+                                    _t('ENFERMEDADES', 'CONDITIONS'),
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 1,
-                                      color: Color(0xFF5C846D),
+                                      color: _labelColor,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -1668,17 +1804,20 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                           Expanded(
                                             child: Text(
                                               selectedConditions.isEmpty
-                                                  ? 'Seleccionar enfermedades'
-                                                  : '${selectedConditions.length} seleccionada(s)',
-                                              style: const TextStyle(
+                                                  ? _t('Seleccionar enfermedades', 'Select conditions')
+                                                  : _t(
+                                                      '${selectedConditions.length} seleccionada(s)',
+                                                      '${selectedConditions.length} selected',
+                                                    ),
+                                              style: TextStyle(
                                                 fontSize: 15,
-                                                color: Color(0xFF345646),
+                                                color: _textPrimary,
                                               ),
                                             ),
                                           ),
-                                          const Icon(
+                                          Icon(
                                             Icons.keyboard_arrow_down,
-                                            color: Color(0xFF5C846D),
+                                            color: _labelColor,
                                           ),
                                         ],
                                       ),
@@ -1693,8 +1832,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                           .map(
                                             (c) => Chip(
                                               label: Text(c.nombre),
-                                              backgroundColor:
-                                                  const Color(0x142E7D52),
+                                              backgroundColor: _chipBackground,
                                             ),
                                           )
                                           .toList(),
@@ -1710,28 +1848,36 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0x192E7D52),
-                                      Color(0x143A9988),
-                                    ],
+                                  gradient: LinearGradient(
+                                    colors: isDark
+                                        ? [
+                                            _accent.withOpacity(0.18),
+                                            const Color(0x141C3B2D),
+                                          ]
+                                        : const [
+                                            Color(0x192E7D52),
+                                            Color(0x143A9988),
+                                          ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                      color: const Color(0x552e7d52)),
+                                      color: _accent.withOpacity(0.35)),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      '🧬 COMPOSICIÓN CORPORAL ESTIMADA',
+                                    Text(
+                                      _t(
+                                        '🧬 COMPOSICIÓN CORPORAL ESTIMADA',
+                                        '🧬 ESTIMATED BODY COMPOSITION',
+                                      ),
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: .8,
-                                        color: Color(0xFF2E8A5E),
+                                        color: _accentStrong,
                                       ),
                                     ),
                                     const SizedBox(height: 8),
@@ -1740,16 +1886,20 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 10, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: const Color(0x19F59E0B),
+                                        color: isDark
+                                            ? const Color(0x1A6C4B1D)
+                                            : const Color(0x19F59E0B),
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
-                                            color: const Color(0x66E38B05)),
+                                            color: isDark
+                                                ? const Color(0x667C5A2A)
+                                                : const Color(0x66E38B05)),
                                       ),
-                                      child: const Row(
+                                      child: Row(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.warning_amber_rounded,
                                             size: 16,
                                             color: Color(0xFFB25A00),
@@ -1757,10 +1907,15 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                           SizedBox(width: 6),
                                           Expanded(
                                             child: Text(
-                                              'Advertencia: no es un numero exacto, es un estimado.',
+                                              _t(
+                                                'Advertencia: no es un numero exacto, es un estimado.',
+                                                'Warning: this is not an exact number, it is an estimate.',
+                                              ),
                                               style: TextStyle(
                                                 fontSize: 11.5,
-                                                color: Color(0xFF8A4A06),
+                                                color: isDark
+                                                    ? const Color(0xFFE2C08A)
+                                                    : const Color(0xFF8A4A06),
                                                 height: 1.3,
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -1774,71 +1929,84 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
+                                          color: _isDark
+                                              ? const Color(0xFF1C2C23)
+                                              : Colors.white,
                                           borderRadius:
                                               BorderRadius.circular(12),
                                           border: Border.all(
-                                            color: const Color(0xFFE2E8E4),
+                                            color: _isDark
+                                                ? const Color(0xFF2E4036)
+                                                : const Color(0xFFE2E8E4),
                                           ),
                                         ),
                                         child: Text(
-                                          'Metas: ${previewTargets.calorie.toStringAsFixed(0)} kcal | P ${previewTargets.protein.toStringAsFixed(0)} g | C ${previewTargets.carbs.toStringAsFixed(0)} g | G ${previewTargets.fat.toStringAsFixed(0)} g',
-                                          style:
-                                              const TextStyle(fontSize: 12.5),
+                                          _t(
+                                            'Metas: ${previewTargets.calorie.toStringAsFixed(0)} kcal | P ${previewTargets.protein.toStringAsFixed(0)} g | C ${previewTargets.carbs.toStringAsFixed(0)} g | G ${previewTargets.fat.toStringAsFixed(0)} g',
+                                            'Targets: ${previewTargets.calorie.toStringAsFixed(0)} kcal | P ${previewTargets.protein.toStringAsFixed(0)} g | C ${previewTargets.carbs.toStringAsFixed(0)} g | F ${previewTargets.fat.toStringAsFixed(0)} g',
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            color: _textPrimary,
+                                          ),
                                         ),
                                       ),
                                     if (previewBodyComp != null) ...[
                                       const SizedBox(height: 8),
                                       LayoutBuilder(
                                         builder: (context, constraints) {
+                                          final sarcopenia =
+                                            _t('Sarcopenia', 'Sarcopenia');
+                                          final normalLabel =
+                                            _t('Normal', 'Normal');
                                           final metricTiles = <Widget>[
                                             _infoMetric(
                                               value:
                                                   '${previewBodyComp.bodyFatPct.toStringAsFixed(1)}%',
-                                              label: '% grasa',
+                                              label: _t('% grasa', '% fat'),
                                               color: const Color(0xFFb84d65),
                                             ),
                                             _infoMetric(
                                               value:
                                                   '${previewBodyComp.musclePct.toStringAsFixed(1)}%',
-                                              label: '% musculo',
+                                              label: _t('% musculo', '% muscle'),
                                               color: const Color(0xFF2e7d52),
                                             ),
                                             _infoMetric(
                                               value:
                                                   '${previewBodyComp.leanBodyMass.toStringAsFixed(1)} kg',
-                                              label: 'masa magra',
+                                              label: _t('masa magra', 'lean mass'),
                                               color: const Color(0xFF3a82aa),
                                             ),
                                             _infoMetric(
                                               value:
                                                   '${previewBodyComp.muscleMass.toStringAsFixed(1)} kg',
-                                              label: 'masa muscular',
+                                              label: _t('masa muscular', 'muscle mass'),
                                               color: const Color(0xFF2e7d52),
                                               highlighted: true,
                                             ),
                                             _infoMetric(
                                               value:
                                                   '${previewBodyComp.boneMass.toStringAsFixed(2)} kg',
-                                              label: 'masa osea',
+                                              label: _t('masa osea', 'bone mass'),
                                               color: const Color(0xFFa05a2a),
                                             ),
                                             _infoMetric(
                                               value:
                                                   '${previewBodyComp.waterMass.toStringAsFixed(1)} L',
-                                              label: 'agua corporal',
+                                              label: _t('agua corporal', 'body water'),
                                               color: const Color(0xFF3a82aa),
                                             ),
                                             _infoMetric(
                                               value:
                                                   '${previewBodyComp.waterPct.toStringAsFixed(1)}%',
-                                              label: '% agua',
+                                              label: _t('% agua', '% water'),
                                               color: const Color(0xFF3a82aa),
                                             ),
                                             _infoMetric(
                                               value: previewBodyComp.bmi
                                                   .toStringAsFixed(1),
-                                              label: 'IMC',
+                                              label: _t('IMC', 'BMI'),
                                               color: previewBodyComp.bmi >= 40
                                                   ? const Color(0xFFb84d65)
                                                   : previewBodyComp.bmi >= 30
@@ -1853,20 +2021,23 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                             _infoMetric(
                                               value: previewBodyComp.smi
                                                   .toStringAsFixed(1),
-                                              label: 'SMI',
+                                              label: _t('SMI', 'SMI'),
                                               color: const Color(0xFF7050a8),
                                             ),
                                             _infoMetric(
                                               value: previewBodyComp
                                                   .muscleCategory,
-                                              label: 'estado muscular',
+                                              label: _t(
+                                                'estado muscular',
+                                                'muscle status',
+                                              ),
                                               color: previewBodyComp
                                                           .muscleCategory ==
-                                                      'Sarcopenia'
+                                                      sarcopenia
                                                   ? const Color(0xFFb84d65)
                                                   : previewBodyComp
                                                               .muscleCategory ==
-                                                          'Normal'
+                                                          normalLabel
                                                       ? const Color(0xFFb8763a)
                                                       : const Color(0xFF2e7d52),
                                             ),
@@ -1904,14 +2075,23 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                             '${previewBodyComp.precisionLabel} ${previewBodyComp.precisionError}',
                                           ),
                                           _statusPill(
-                                            'Estado: ${_bmiCategory(previewBodyComp.bmi)}',
+                                            _t(
+                                              'Estado: ${_bmiCategory(previewBodyComp.bmi)}',
+                                              'Status: ${_bmiCategory(previewBodyComp.bmi)}',
+                                            ),
                                           ),
                                           if (previewBodyComp.bmi < 25)
                                             _statusPill(
-                                              'Perfil graso: ${previewBodyComp.bodyCategory}',
+                                              _t(
+                                                'Perfil graso: ${previewBodyComp.bodyCategory}',
+                                                'Fat profile: ${previewBodyComp.bodyCategory}',
+                                              ),
                                             ),
                                           _statusPill(
-                                            'Hidratacion: ${previewBodyComp.waterStatus}',
+                                            _t(
+                                              'Hidratacion: ${previewBodyComp.waterStatus}',
+                                              'Hydration: ${previewBodyComp.waterStatus}',
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -1922,19 +2102,27 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                             child: Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: const Color(0x12a05a2a),
+                                                color: isDark
+                                                    ? const Color(0x1A3A2B1E)
+                                                    : const Color(0x12a05a2a),
                                                 borderRadius:
                                                     BorderRadius.circular(10),
                                                 border: Border.all(
-                                                  color:
-                                                      const Color(0x33a05a2a),
+                                                  color: isDark
+                                                      ? const Color(0x334B3A2B)
+                                                      : const Color(0x33a05a2a),
                                                 ),
                                               ),
                                               child: Text(
-                                                'Hueso: ${previewBodyComp.boneMass.toStringAsFixed(2)} kg (${previewBodyComp.bonePct.toStringAsFixed(1)}%)\n${previewBodyComp.boneCategory}',
-                                                style: const TextStyle(
+                                                _t(
+                                                  'Hueso: ${previewBodyComp.boneMass.toStringAsFixed(2)} kg (${previewBodyComp.bonePct.toStringAsFixed(1)}%)\n${previewBodyComp.boneCategory}',
+                                                  'Bone: ${previewBodyComp.boneMass.toStringAsFixed(2)} kg (${previewBodyComp.bonePct.toStringAsFixed(1)}%)\n${previewBodyComp.boneCategory}',
+                                                ),
+                                                style: TextStyle(
                                                   fontSize: 11,
-                                                  color: Color(0xFF7a4321),
+                                                  color: isDark
+                                                      ? const Color(0xFFD6B18F)
+                                                      : const Color(0xFF7a4321),
                                                   height: 1.35,
                                                 ),
                                               ),
@@ -1945,19 +2133,27 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                             child: Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: const Color(0x123a82aa),
+                                                color: isDark
+                                                    ? const Color(0x1A1B3A4E)
+                                                    : const Color(0x123a82aa),
                                                 borderRadius:
                                                     BorderRadius.circular(10),
                                                 border: Border.all(
-                                                  color:
-                                                      const Color(0x333a82aa),
+                                                  color: isDark
+                                                      ? const Color(0x33446666)
+                                                      : const Color(0x333a82aa),
                                                 ),
                                               ),
                                               child: Text(
-                                                'Agua: ${previewBodyComp.waterMass.toStringAsFixed(1)} L (${previewBodyComp.waterPct.toStringAsFixed(1)}%)\nIC ${previewBodyComp.waterIC.toStringAsFixed(1)}L · EC ${previewBodyComp.waterEC.toStringAsFixed(1)}L',
-                                                style: const TextStyle(
+                                                _t(
+                                                  'Agua: ${previewBodyComp.waterMass.toStringAsFixed(1)} L (${previewBodyComp.waterPct.toStringAsFixed(1)}%)\nIC ${previewBodyComp.waterIC.toStringAsFixed(1)}L · EC ${previewBodyComp.waterEC.toStringAsFixed(1)}L',
+                                                  'Water: ${previewBodyComp.waterMass.toStringAsFixed(1)} L (${previewBodyComp.waterPct.toStringAsFixed(1)}%)\nIC ${previewBodyComp.waterIC.toStringAsFixed(1)}L · EC ${previewBodyComp.waterEC.toStringAsFixed(1)}L',
+                                                ),
+                                                style: TextStyle(
                                                   fontSize: 11,
-                                                  color: Color(0xFF2c607a),
+                                                  color: isDark
+                                                      ? const Color(0xFF9DC7E2)
+                                                      : const Color(0xFF2c607a),
                                                   height: 1.35,
                                                 ),
                                               ),
@@ -1968,9 +2164,11 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                       const SizedBox(height: 8),
                                       Text(
                                         previewBodyComp.precisionHint,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11,
-                                          color: Color(0xFF4F6F5E),
+                                          color: _isDark
+                                              ? const Color(0xFF9DB2A6)
+                                              : const Color(0xFF4F6F5E),
                                         ),
                                       ),
                                     ] else
@@ -1978,11 +2176,19 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                         padding: const EdgeInsets.only(top: 8),
                                         child: Text(
                                           _gender == 'female'
-                                              ? 'Agrega cintura, cuello y cadera para mostrar composicion corporal.'
-                                              : 'Agrega cintura y cuello para mostrar composicion corporal.',
-                                          style: const TextStyle(
+                                              ? _t(
+                                                  'Agrega cintura, cuello y cadera para mostrar composicion corporal.',
+                                                  'Add waist, neck, and hip to show body composition.',
+                                                )
+                                              : _t(
+                                                  'Agrega cintura y cuello para mostrar composicion corporal.',
+                                                  'Add waist and neck to show body composition.',
+                                                ),
+                                                style: TextStyle(
                                             fontSize: 12,
-                                            color: Color(0xFF4F6F5E),
+                                                  color: _isDark
+                                                      ? const Color(0xFF9DB2A6)
+                                                      : const Color(0xFF4F6F5E),
                                           ),
                                         ),
                                       ),
@@ -1997,7 +2203,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                               child: ElevatedButton(
                                 onPressed: _saving ? null : _save,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2e7d52),
+                                  backgroundColor: _accent,
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -2012,7 +2218,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Text('Guardar medidas'),
+                                    : Text(_t('Guardar medidas', 'Save measurements')),
                               ),
                             ),
                           ],

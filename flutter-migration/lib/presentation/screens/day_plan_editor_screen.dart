@@ -5,6 +5,7 @@ import '../../core/utils/iterable_extensions.dart';
 import '../../domain/models/food_item.dart';
 import '../../domain/models/planner_types.dart';
 import '../providers/planner_providers.dart';
+import '../../services/food_name_translator.dart';
 
 class _FoodPickerResult {
   final int foodItemId;
@@ -136,8 +137,12 @@ Future<_FoodPickerResult?> _showFoodPicker(
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final food = filtered[index];
+                            final displayName = FoodNameTranslator.translate(
+                              food.name,
+                              Localizations.localeOf(context),
+                            );
                             return ListTile(
-                              title: Text(food.name),
+                              title: Text(displayName),
                               subtitle: Text(
                                 '${food.per100.calories.toStringAsFixed(0)} kcal/100g',
                               ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/food_item.dart';
 import '../../domain/models/planner_types.dart';
 import '../providers/planner_providers.dart';
+import '../../services/food_name_translator.dart';
 import 'day_plan_editor_screen.dart';
 import 'month_calendar_screen.dart';
 import 'recipe_today_screen.dart';
@@ -350,10 +351,14 @@ class _UndesiredFoodsSelector extends StatelessWidget {
       itemCount: sortedFoods.length,
       itemBuilder: (context, index) {
         final food = sortedFoods[index];
+        final displayName = FoodNameTranslator.translate(
+          food.name,
+          Localizations.localeOf(context),
+        );
         return CheckboxListTile(
           dense: true,
           value: selectedFoodIds.contains(food.id),
-          title: Text('${food.emoji} ${food.name}'),
+          title: Text('${food.emoji} $displayName'),
           onChanged: (_) => onToggle(food.id),
         );
       },

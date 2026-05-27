@@ -11,6 +11,7 @@ import '../models/food_models.dart';
 import '../models/shop_models.dart';
 import '../repositories/food_repository.dart';
 import '../services/daily_macro_notification_service.dart';
+import '../services/food_name_translator.dart';
 import '../widgets/food_logger_sheet.dart';
 import '../presentation/screens/planificar_home_screen.dart';
 import '../presentation/screens/recipe_today_screen.dart';
@@ -283,6 +284,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool get _isSpanish => _currentLocale.languageCode == 'es';
 
   String _t(String es, String en) => _isSpanish ? es : en;
+
+  String _foodName(String name) {
+    return FoodNameTranslator.translate(name, _currentLocale);
+  }
 
   @override
   void initState() {
@@ -600,7 +605,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: const Color(0xFFDCEBDD),
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF1F4C36)
+          : const Color(0xFFDCEBDD),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -609,6 +616,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         fallbackFoods: _quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods,
         initialMealTime: _getCurrentMealTime(),
         excludedFoodIds: _undesiredFoodIds,
+        locale: _currentLocale,
       ),
     );
 
@@ -644,7 +652,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${food.emoji} ${food.name} agregado'),
+          content: Text(
+            '${food.emoji} ${_foodName(food.name)} ${_t('agregado', 'added')}',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -668,7 +678,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final sectionBeforeOpen = _activeSection == 3 ? _lastSectionBeforeProfile : _activeSection;
     final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
-        builder: (_) => ProfileMeasurementsScreen(repository: _repo),
+        builder: (_) => ProfileMeasurementsScreen(
+          repository: _repo,
+          locale: _currentLocale,
+        ),
       ),
     );
 
@@ -971,6 +984,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     };
   }
 
+  String _mealTimeLabel(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'desayuno' || normalized == 'breakfast') {
+      return _t('Desayuno', 'Breakfast');
+    }
+    if (normalized == 'almuerzo' || normalized == 'lunch') {
+      return _t('Almuerzo', 'Lunch');
+    }
+    if (normalized == 'cena' || normalized == 'dinner') {
+      return _t('Cena', 'Dinner');
+    }
+    if (normalized == 'merienda' || normalized == 'snack') {
+      return _t('Merienda', 'Snack');
+    }
+    return value;
+  }
+
   NutritionInfo _computePlanTotals(List<_PlannedMealItem> items) {
     var totals = NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
     for (final item in items) {
@@ -1137,7 +1167,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 return ListTile(
                   leading:
                       Text(food.emoji, style: const TextStyle(fontSize: 20)),
-                  title: Text(food.name),
+                  title: Text(_foodName(food.name)),
                   subtitle: Text(
                     '${food.calories.toStringAsFixed(0)} kcal/100g · '
                     'P ${food.protein.toStringAsFixed(1)} · '
@@ -1361,7 +1391,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          '${item.food.name} · ${item.grams.toStringAsFixed(0)}g',
+                                          '${_foodName(item.food.name)} · ${item.grams.toStringAsFixed(0)}g',
                                           style: const TextStyle(
                                             color: Color(0xFF325441),
                                             fontSize: 13,
@@ -2347,7 +2377,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          '${_mealLabel(item.mealKey)} · ${item.food.name}',
+                                          '${_mealLabel(item.mealKey)} · ${_foodName(item.food.name)}',
                                           style: const TextStyle(
                                             fontSize: 13,
                                             color: Color(0xFF325441),
@@ -3200,10 +3230,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   String _getCurrentMealTime() {
     final hour = DateTime.now().hour;
-    if (hour < 11) return _t('Desayuno', 'Breakfast');
-    if (hour < 16) return _t('Almuerzo', 'Lunch');
-    if (hour < 21) return _t('Cena', 'Dinner');
-    return _t('Merienda', 'Snack');
+    if (hour < 11) return 'Desayuno';
+    if (hour < 16) return 'Almuerzo';
+    if (hour < 21) return 'Cena';
+    return 'Merienda';
   }
 
   @override
@@ -4773,19 +4803,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const SizedBox(height: 7),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(99),
-                    child: Container(
-                      height: 8,
-                      color: const Color(0xFFE8F1E8),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: percent,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [macro.color.withValues(alpha: 0.85), macro.color],
-                            ),
-                          ),
-                        ),
+                    child: SizedBox(
+                      height: 9,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final fillWidth = percent <= 0
+                              ? 0.0
+                              : math.max(2.0, constraints.maxWidth * percent);
+
+                          return Stack(
+                            children: [
+                              const Positioned.fill(
+                                child: ColoredBox(color: Color(0xFFDDE8E0)),
+                              ),
+                              if (fillWidth > 0)
+                                Positioned(
+                                  left: 0,
+                                  top: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: fillWidth,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          macro.color.withValues(alpha: 0.85),
+                                          macro.color,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: const Color(0xFFCBD9D0),
+                                    ),
+                                    borderRadius: BorderRadius.circular(99),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -5212,7 +5272,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          food.name,
+                          _foodName(food.name),
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
@@ -5428,7 +5488,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Text(
-                food.name,
+                _foodName(food.name),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -5568,7 +5628,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      entry.foodName,
+                      _foodName(entry.foodName),
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -5577,7 +5637,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${entry.mealTime} • ${entry.quantity.toInt()}g',
+                      '${_mealTimeLabel(entry.mealTime)} • ${entry.quantity.toInt()}g',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF6A8D76),

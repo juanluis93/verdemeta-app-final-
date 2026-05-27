@@ -192,25 +192,35 @@ class MonthlyPlannerService {
       MealType.snack: <Set<int>>[],
       MealType.beverage: <Set<int>>[],
     };
+    final monthUsedByMealType = <MealType, Set<int>>{
+      MealType.breakfast: <int>{},
+      MealType.lunch: <int>{},
+      MealType.dinner: <int>{},
+      MealType.snack: <int>{},
+    };
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final dayPlans = <DayPlan>[];
     final planSeed = _createPlanSeed();
 
     for (var day = 1; day <= daysInMonth; day++) {
       final date = DateTime(year, month, day);
-      final recentIdsByMealType = <MealType, Set<int>>{
+      final avoidIdsByMealType = <MealType, Set<int>>{
         for (final entry in recentMealHistory.entries)
           entry.key: entry.value.fold<Set<int>>(
             <int>{},
             (acc, ids) => acc..addAll(ids),
           ),
       };
+      for (final entry in monthUsedByMealType.entries) {
+        final existing = avoidIdsByMealType[entry.key] ?? <int>{};
+        avoidIdsByMealType[entry.key] = existing..addAll(entry.value);
+      }
       final draft = _buildInitialDayPlan(
         date,
         effectiveCatalog,
         planSeed,
         goals,
-        recentIdsByMealType,
+        avoidIdsByMealType,
       );
       final balanced = _rebalanceService.rebalanceDay(
         dayPlan: draft,
@@ -226,6 +236,8 @@ class MonthlyPlannerService {
         if (history.length > _varietyWindowDays) {
           history.removeAt(0);
         }
+        final monthUsed = monthUsedByMealType[item.mealType];
+        monthUsed?.add(item.foodItemId);
       }
     }
 
@@ -244,7 +256,7 @@ class MonthlyPlannerService {
     List<FoodItem> catalog,
     int planSeed,
     NutritionalGoals goals,
-    Map<MealType, Set<int>> recentIdsByMealType,
+    Map<MealType, Set<int>> avoidIdsByMealType,
   ) {
     if (catalog.isEmpty) {
       throw StateError('Catalog empty');
@@ -258,7 +270,7 @@ class MonthlyPlannerService {
     for (var index = 0; index < mealTypes.length; index++) {
       final mealType = mealTypes[index];
       final basePool = _filterCatalogForMeal(catalog, mealType);
-      final recentIds = recentIdsByMealType[mealType] ?? const <int>{};
+      final recentIds = avoidIdsByMealType[mealType] ?? const <int>{};
       final pool = _expandPoolForVariety(
         mealType,
         basePool,

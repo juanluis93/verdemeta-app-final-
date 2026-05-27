@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/planner_providers.dart';
+import '../../services/food_name_translator.dart';
 import 'day_plan_editor_screen.dart';
 
 class RecipeTodayScreen extends ConsumerWidget {
@@ -11,8 +12,10 @@ class RecipeTodayScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final today = ref.watch(todayPlanProvider);
     final foodCatalog = ref.watch(foodCatalogProvider).valueOrNull ?? const [];
+    final locale = Localizations.localeOf(context);
     final foodNameById = {
-      for (final food in foodCatalog) food.id: food.name,
+      for (final food in foodCatalog)
+        food.id: FoodNameTranslator.translate(food.name, locale),
     };
 
     return Scaffold(
