@@ -13,7 +13,6 @@ import '../repositories/food_repository.dart';
 import '../services/daily_macro_notification_service.dart';
 import '../services/food_name_translator.dart';
 import '../widgets/food_logger_sheet.dart';
-import '../presentation/screens/planificar_home_screen.dart';
 import '../presentation/screens/recipe_today_screen.dart';
 import 'profile_measurements_screen.dart';
 import 'shop_screen.dart';
@@ -25,13 +24,11 @@ class _PlannerRequest {
   final int year;
   final int month;
   final bool prioritizeQuickFoods;
-  final bool manualMode;
 
   const _PlannerRequest({
     required this.year,
     required this.month,
     required this.prioritizeQuickFoods,
-    required this.manualMode,
   });
 }
 
@@ -1889,68 +1886,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  _MonthlyDietPlan _generateManualMonthlyPlan({
-    required int year,
-    required int month,
-    required List<Food> foods,
-    required double calorieTarget,
-    required double proteinTarget,
-    required double carbsTarget,
-    required double fatTarget,
-  }) {
-    final validFoods = foods.where((food) => food.calories > 0).toList();
-    final sourceFoods = validFoods.isNotEmpty ? validFoods : _webPreviewFoods;
-    final daysInMonth = DateTime(year, month + 1, 0).day;
-    final plans = <_DailyDietPlan>[];
-    final recentLunchIds = <int>[];
-
-    for (var day = 1; day <= daysInMonth; day++) {
-      final seed = (year * 1300) + (month * 50) + day;
-      final breakfast = _pickFood(sourceFoods, seed);
-      final lunch = _pickFoodAvoidingRecent(
-        sourceFoods,
-        seed + 7,
-        fallback: breakfast,
-        recentIds: recentLunchIds.toSet(),
-        avoid: breakfast,
-      );
-      final snack = _pickFood(sourceFoods, seed + 13, fallback: lunch);
-      final dinner = _pickFood(sourceFoods, seed + 19, fallback: breakfast);
-
-      final items = <_PlannedMealItem>[
-        _PlannedMealItem(mealKey: 'breakfast', food: breakfast, grams: 140),
-        _PlannedMealItem(mealKey: 'lunch', food: lunch, grams: 180),
-        _PlannedMealItem(mealKey: 'snack', food: snack, grams: 80),
-        _PlannedMealItem(mealKey: 'dinner', food: dinner, grams: 180),
-      ];
-
-      final totals = _computePlanTotals(items);
-      plans.add(
-        _DailyDietPlan(
-          date: DateTime(year, month, day),
-          items: items,
-          totals: totals,
-        ),
-      );
-
-      if (lunch.id != null) {
-        recentLunchIds.add(lunch.id!);
-        if (recentLunchIds.length > 7) {
-          recentLunchIds.removeAt(0);
-        }
-      }
-    }
-
-    return _MonthlyDietPlan(
-      year: year,
-      month: month,
-      targetCalories: calorieTarget,
-      targetProtein: proteinTarget,
-      targetCarbs: carbsTarget,
-      targetFat: fatTarget,
-      days: plans,
-    );
-  }
 
   _DailyDietPlan? _getDailyPlanForDate(DateTime date) {
     final plan = _monthlyDietPlan;
@@ -1977,7 +1912,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     var selectedYear = now.year;
     var selectedMonth = now.month;
     var prioritizeQuickFoods = true;
-    var manualMode = false;
 
     final request = await showDialog<_PlannerRequest>(
       context: context,
@@ -2094,24 +2028,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      SwitchListTile.adaptive(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: manualMode,
-                        onChanged: (value) {
-                          setDialogState(() => manualMode = value);
-                        },
-                        title: Text(
-                          _t('Modo manual asistido', 'Assisted manual mode'),
-                        ),
-                        subtitle: Text(
-                          _t(
-                            'Genera un borrador editable para personalizar plato por plato.',
-                            'Generates an editable draft so you can customize dish by dish.',
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -2128,7 +2044,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         year: selectedYear,
                         month: selectedMonth,
                         prioritizeQuickFoods: prioritizeQuickFoods,
-                        manualMode: manualMode,
                       ),
                     );
                   },
@@ -2155,25 +2070,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ? prioritizedFoods
         : (_quickFoods.isNotEmpty ? _quickFoods : _webPreviewFoods);
 
-    final plan = request.manualMode
-        ? _generateManualMonthlyPlan(
-            year: request.year,
-            month: request.month,
-            foods: sourceFoods,
-            calorieTarget: _targetCalories,
-            proteinTarget: _targetProtein,
-            carbsTarget: _targetCarbs,
-            fatTarget: _targetFat,
-          )
-        : _generateMonthlyDietPlan(
-            year: request.year,
-            month: request.month,
-            foods: sourceFoods,
-            calorieTarget: _targetCalories,
-            proteinTarget: _targetProtein,
-            carbsTarget: _targetCarbs,
-            fatTarget: _targetFat,
-          );
+    final plan = _generateMonthlyDietPlan(
+      year: request.year,
+      month: request.month,
+      foods: sourceFoods,
+      calorieTarget: _targetCalories,
+      proteinTarget: _targetProtein,
+      carbsTarget: _targetCarbs,
+      fatTarget: _targetFat,
+    );
 
     final evaluation = _evaluateMonthlyPlan(plan);
     final planIsValid = evaluation.$1;
@@ -2205,12 +2110,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     Text(
                       _t(
-                        request.manualMode
-                            ? 'Se generó tu borrador manual. Personaliza platos por día y guarda solo cuando cada día cumpla objetivos.'
-                            : 'Se generó el plan mensual automáticamente. Algunos días tienen recomendaciones para mejorar el balance nutricional.',
-                        request.manualMode
-                            ? 'Your manual draft was generated. Customize dishes by day and save only when each day meets targets.'
-                            : 'Your monthly plan was generated automatically. Some days include recommendations to improve nutritional balance.',
+                        'Se generó el plan mensual automáticamente. Algunos días tienen recomendaciones para mejorar el balance nutricional.',
+                        'Your monthly plan was generated automatically. Some days include recommendations to improve nutritional balance.',
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -2253,11 +2154,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
       );
-    }
-
-    if (request.manualMode) {
-      await _openPlannedRecipesForDay();
-      return;
     }
 
     _showMonthlyPlanDetails();
@@ -3429,13 +3325,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         icon: Icons.calendar_month_rounded,
                         label: _t('Planificador', 'Planner'),
                         background: const Color(0xFFE96C79),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const PlanificarHomeScreen(),
-                            ),
-                          );
-                        },
+                        onTap: _openDietPlanner,
                       ),
                     ),
                     const SizedBox(width: 12),

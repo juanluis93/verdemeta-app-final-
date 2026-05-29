@@ -19,7 +19,7 @@ class PlanificarHomeScreen extends ConsumerStatefulWidget {
 
 class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
   DateTime target = DateTime.now();
-  static const String plannerBuild = 'PLANNER-MANUAL-20260405-C';
+  static const String plannerBuild = 'PLANNER-AUTO-20260527-A';
 
   String _goalLabel(GoalType goalType) {
     return switch (goalType) {
@@ -207,7 +207,7 @@ class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
                       border: Border.all(color: const Color(0xFFB8DABA)),
                     ),
                     child: const Text(
-                      'Modo manual activo por defecto. Al crear el plan se abre directo el editor del día.',
+                      'Genera el plan automaticamente y luego edita las comidas que quieras.',
                       style: TextStyle(
                         fontSize: 12,
                         color: Color(0xFF2E8A5E),
@@ -264,7 +264,7 @@ class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
                               ),
                             );
                           },
-                    child: const Text('Crear plan y editar manualmente'),
+                    child: const Text('Crear plan automatico y editar'),
                   ),
                 ],
               ),
@@ -311,7 +311,7 @@ class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
                 );
               },
               icon: const Icon(Icons.tune_rounded),
-              label: const Text('Editar manualmente hoy'),
+              label: const Text('Editar comidas de hoy'),
             ),
           ],
           const SizedBox(height: 16),
