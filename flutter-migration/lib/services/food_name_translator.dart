@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+abstract class FoodNameTranslationService {
+  String translate(String name, Locale locale);
+}
+
 class FoodNameTranslator {
   static String translate(String name, Locale locale) {
     if (locale.languageCode == 'es') return name;
@@ -263,4 +267,13 @@ class FoodNameTranslator {
     'zumo de naranja y remolacha': 'Orange beet juice',
     'shepherds pie vegano': 'Vegan shepherd\'s pie',
   };
+}
+
+class DefaultFoodNameTranslationService implements FoodNameTranslationService {
+  const DefaultFoodNameTranslationService();
+
+  @override
+  String translate(String name, Locale locale) {
+    return FoodNameTranslator.translate(name, locale);
+  }
 }

@@ -11,6 +11,48 @@ import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 import '../models/food_models.dart';
 
+abstract class AuthRepository {
+  Future<UserAccount?> getUserByUsername(String username);
+  Future<UserAccount?> getUserById(int userId);
+  Future<UserAccount> loginUser({
+    required String username,
+    required String password,
+  });
+  Future<UserAccount> registerUser({
+    required String username,
+    required String password,
+  });
+}
+
+abstract class UserSessionRepository {
+  int? get currentUserId;
+  String? get currentUsername;
+
+  Future<void> ensureDailyRollover({String? todayKey});
+  Future<List<Food>> searchFoods(String query);
+  Future<List<Food>> getQuickFoods();
+  Future<List<Food>> getAllFoods();
+  Future<int> addCustomFood(Food food);
+  Future<int> logFood(FoodLogEntry entry);
+  Future<int> deleteFoodLog(int id);
+  Future<List<FoodLogEntry>> getFoodLogByDate(String date);
+  Future<NutritionInfo> getDailyTotals(String date);
+  Future<Map<String, NutritionInfo>> getDailyTotalsForDays(int days);
+  Future<void> saveWaterIntake(int cups, String date);
+  Future<int> getWaterIntake(String date);
+
+  Future<UserProfile?> getUserProfile();
+  Future<void> saveUserProfile(UserProfile profile);
+  Future<List<HealthCondition>> getHealthConditions();
+  Future<ProfileRecord?> getBaselineProfileRecord();
+  Future<ProfileRecord?> getLatestProfileRecord();
+  Future<bool> hasUserProfile();
+}
+
+abstract class UserSessionFactory {
+  UserSessionRepository forUser(UserAccount account);
+}
+
 class AuthException implements Exception {
   final String code;
   final String message;
@@ -21,9 +63,11 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
-class FoodRepository {
+class FoodRepository implements AuthRepository, UserSessionRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
+  @override
   final int? currentUserId;
+  @override
   final String? currentUsername;
 
   FoodRepository({this.currentUserId, this.currentUsername});
@@ -721,7 +765,6 @@ class FoodRepository {
     final profile = await getUserProfile();
     return profile != null;
   }
-
   // ═══════════════════════════════════════════════════
   // OPERACIONES DE ALIMENTOS APRENDIDOS POR IA
   // ═══════════════════════════════════════════════════
@@ -771,5 +814,12 @@ class FoodRepository {
       'UPDATE ai_learned_foods SET times_used = times_used + 1 WHERE LOWER(name) = ?',
       [name.toLowerCase()],
     );
+  }
+}
+
+class FoodRepositorySessionFactory implements UserSessionFactory {
+  @override
+  UserSessionRepository forUser(UserAccount account) {
+    return FoodRepository().forUser(account);
   }
 }

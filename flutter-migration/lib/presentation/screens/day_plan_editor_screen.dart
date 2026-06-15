@@ -18,6 +18,7 @@ Future<_FoodPickerResult?> _showFoodPicker(
   BuildContext context,
   List<FoodItem> foods, {
   required String title,
+    required FoodNameTranslationService translationService,
   MealType? initialMealType,
   bool includeMealType = false,
 }) async {
@@ -137,7 +138,7 @@ Future<_FoodPickerResult?> _showFoodPicker(
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final food = filtered[index];
-                            final displayName = FoodNameTranslator.translate(
+                              final displayName = translationService.translate(
                               food.name,
                               Localizations.localeOf(context),
                             );
@@ -173,15 +174,21 @@ Future<_FoodPickerResult?> _showFoodPicker(
 }
 
 class DayPlanEditorScreen extends ConsumerWidget {
-  const DayPlanEditorScreen({super.key, required this.date});
+    const DayPlanEditorScreen({
+      super.key,
+      required this.date,
+      this.translationService = const DefaultFoodNameTranslationService(),
+    });
 
   final DateTime date;
+    final FoodNameTranslationService translationService;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final editor = ref.watch(dayEditorProvider(date));
     final foods = ref.watch(foodCatalogProvider).valueOrNull ?? const [];
     final workingDay = editor.workingDay;
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       appBar: AppBar(title: Text('Editar día ${date.day}/${date.month}')),
@@ -206,9 +213,12 @@ class DayPlanEditorScreen extends ConsumerWidget {
                 ...workingDay.items.map((item) {
                   final food =
                       foods.where((f) => f.id == item.foodItemId).firstOrNull;
+                  final displayName = food == null
+                      ? 'Food ${item.foodItemId}'
+                      : translationService.translate(food.name, locale);
                   return Card(
                     child: ListTile(
-                      title: Text(food?.name ?? 'Food ${item.foodItemId}'),
+                      title: Text(displayName),
                       subtitle: Text(
                           '${item.mealType.name} · ${item.grams.toStringAsFixed(0)}g'),
                       trailing: Wrap(
@@ -221,6 +231,7 @@ class DayPlanEditorScreen extends ConsumerWidget {
                                 context,
                                 foods,
                                 title: 'Seleccionar alimento',
+                                  translationService: translationService,
                               );
                               if (selection == null) return;
                               ref
@@ -258,6 +269,7 @@ class DayPlanEditorScreen extends ConsumerWidget {
                             title: 'Agregar alimento',
                             includeMealType: true,
                             initialMealType: MealType.snack,
+                              translationService: translationService,
                           );
                           if (selection == null) return;
                           ref

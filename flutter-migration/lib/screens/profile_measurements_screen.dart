@@ -57,13 +57,15 @@ class _BodyCompEstimate {
 }
 
 class ProfileMeasurementsScreen extends StatefulWidget {
-  final FoodRepository repository;
+  final UserSessionRepository repository;
   final Locale locale;
+  final FoodNameTranslationService translationService;
 
   const ProfileMeasurementsScreen({
     super.key,
     required this.repository,
     required this.locale,
+    this.translationService = const DefaultFoodNameTranslationService(),
   });
 
   @override
@@ -155,7 +157,7 @@ class _ProfileMeasurementsScreenState extends State<ProfileMeasurementsScreen> {
   String _t(String es, String en) => _isSpanish ? es : en;
 
   String _foodName(String name) {
-    return FoodNameTranslator.translate(name, _currentLocale);
+    return widget.translationService.translate(name, _currentLocale);
   }
 
   String _safeGender(String value) {

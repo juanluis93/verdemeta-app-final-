@@ -261,7 +261,7 @@ class _ProductCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: isExpanded ? 190 : 150,
+                  height: isExpanded ? 230 : 180,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FCF8),
@@ -320,7 +320,8 @@ class _ProductCard extends StatelessWidget {
                       borderRadius: BorderRadius.vertical(top: Radius.circular(isExpanded ? 15 : 15)),
                       child: Image.network(
                         product.image,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
                         headers: const {
                           'User-Agent': 'Mozilla/5.0',
                         },

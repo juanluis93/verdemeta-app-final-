@@ -5,6 +5,18 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../models/food_models.dart';
 
+abstract class MacroNotificationService {
+  Future<bool> requestPermissionIfNeeded();
+  Future<void> scheduleEndOfDaySummary({
+    required bool isSpanish,
+    required NutritionInfo totals,
+    required UserProfile? profile,
+    int hour,
+    int minute,
+  });
+  Future<void> cancelEndOfDaySummary();
+}
+
 class DailyMacroNotificationService {
   static const int _notificationId = 1001;
   static const String _channelId = 'daily_macro_summary_channel';
@@ -124,5 +136,36 @@ class DailyMacroNotificationService {
     if (kIsWeb) return;
     await initialize();
     await _plugin.cancel(_notificationId);
+  }
+}
+
+class DefaultDailyMacroNotificationService implements MacroNotificationService {
+  const DefaultDailyMacroNotificationService();
+
+  @override
+  Future<bool> requestPermissionIfNeeded() {
+    return DailyMacroNotificationService.requestPermissionIfNeeded();
+  }
+
+  @override
+  Future<void> scheduleEndOfDaySummary({
+    required bool isSpanish,
+    required NutritionInfo totals,
+    required UserProfile? profile,
+    int hour = 21,
+    int minute = 0,
+  }) {
+    return DailyMacroNotificationService.scheduleEndOfDaySummary(
+      isSpanish: isSpanish,
+      totals: totals,
+      profile: profile,
+      hour: hour,
+      minute: minute,
+    );
+  }
+
+  @override
+  Future<void> cancelEndOfDaySummary() {
+    return DailyMacroNotificationService.cancelEndOfDaySummary();
   }
 }

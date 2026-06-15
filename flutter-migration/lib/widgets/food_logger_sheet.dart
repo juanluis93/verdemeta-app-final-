@@ -7,11 +7,12 @@ import '../repositories/food_repository.dart';
 import '../services/food_name_translator.dart';
 
 class AddFoodBottomSheet extends StatefulWidget {
-  final FoodRepository repository;
+  final UserSessionRepository repository;
   final List<Food> fallbackFoods;
   final String initialMealTime;
   final Set<int> excludedFoodIds;
   final Locale locale;
+  final FoodNameTranslationService translationService;
 
   const AddFoodBottomSheet({
     required this.repository,
@@ -19,6 +20,7 @@ class AddFoodBottomSheet extends StatefulWidget {
     required this.excludedFoodIds,
     required this.initialMealTime,
     required this.locale,
+    this.translationService = const DefaultFoodNameTranslationService(),
   });
 
   @override
@@ -70,10 +72,7 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
   String _t(String es, String en) => _isSpanish ? es : en;
 
   String _foodName(String name) {
-    return FoodNameTranslator.translate(
-      name,
-      widget.locale,
-    );
+    return widget.translationService.translate(name, widget.locale);
   }
 
   String _mealTimeKey(String value) {

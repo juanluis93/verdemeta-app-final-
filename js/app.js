@@ -982,20 +982,38 @@ function buildQuickFoods() {
   });
 }
 
+function getSelectedQuantity() {
+  const rawQty = document.getElementById('m-qty').value.trim().replace(',', '.');
+  const qty = Number(rawQty);
+  return qty > 0 ? qty : 100;
+}
+
 /**
- * Adds a quick food to the log with default portion (100g)
+ * Adds a quick food to the log using the entered quantity
  * @param {Object} f - Food object from quickFoods array
  */
 async function addQuickFood(f) {
   const meal = document.getElementById('meal-time').value;
+  const qty = getSelectedQuantity();
+  const ratio = qty / 100;
   
-  // Create food log entry
+  // Create food log entry scaled to the requested amount
   const entry = {
-    ...f,  // Spread all nutritional data
+    ...f,
+    cal: Math.round(f.cal * ratio),
+    prot: +(f.prot * ratio).toFixed(1),
+    carb: +(f.carb * ratio).toFixed(1),
+    fat: +(f.fat * ratio).toFixed(1),
+    fiber: +(f.fiber * ratio).toFixed(1),
+    sugar: +(f.sugar * ratio).toFixed(1),
+    iron: +(f.iron * ratio).toFixed(1),
+    calcium: +(f.calcium * ratio).toFixed(1),
+    b12: +(f.b12 * ratio).toFixed(2),
+    zinc: +(f.zinc * ratio).toFixed(1),
     meal,
     date: todayKey(),
     time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-    qty: 100,
+    qty,
     id: Date.now()
   };
   
@@ -1007,7 +1025,7 @@ async function addQuickFood(f) {
   renderHistory();
   updateCharts();
   
-  showToast(`${f.emoji} ${f.name} agregado · +${f.cal} kcal`);
+  showToast(`${f.emoji} ${f.name} agregado · +${entry.cal} kcal`);
 }
 
 

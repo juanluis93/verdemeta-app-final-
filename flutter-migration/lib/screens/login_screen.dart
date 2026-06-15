@@ -1,12 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../presentation/providers/legacy_providers.dart';
 import '../repositories/food_repository.dart';
+import '../services/daily_macro_notification_service.dart';
+import '../services/food_name_translator.dart';
 import 'home_screen.dart';
 import 'profile_measurements_screen.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   final Locale locale;
   final ValueChanged<Locale> onLanguageChanged;
   final ThemeMode themeMode;
@@ -21,16 +25,19 @@ class LoginScreen extends StatefulWidget {
   });
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
 enum _AuthMode { login, register }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   static const _sessionUserIdKey = 'session_user_id';
   static const _loginBuildStamp = 'MANUAL-D-20260405';
+  late final AuthRepository _authRepository;
+  late final UserSessionFactory _sessionFactory;
+  late final MacroNotificationService _notificationService;
+  late final FoodNameTranslationService _translationService;
 
-  final FoodRepository _repo = FoodRepository();
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
@@ -66,6 +73,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _authRepository = ref.read(authRepositoryProvider);
+    _sessionFactory = ref.read(userSessionFactoryProvider);
+    _notificationService = ref.read(macroNotificationServiceProvider);
+    _translationService = ref.read(foodNameTranslationServiceProvider);
     _currentLocale = widget.locale;
     _currentThemeMode = widget.themeMode;
     _restoreSession();
@@ -102,13 +113,15 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _openHome(FoodRepository scopedRepo) async {
+  Future<void> _openHome(UserSessionRepository scopedRepo) async {
     if (!mounted) return;
 
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => HomeScreen(
           repository: scopedRepo,
+          notificationService: _notificationService,
+          translationService: _translationService,
           onLogoutRequested: _handleLogout,
           locale: _currentLocale,
           onLanguageChanged: widget.onLanguageChanged,
@@ -136,13 +149,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (savedUserId == null) return;
 
-      final account = await _repo.getUserById(savedUserId);
+      final account = await _authRepository.getUserById(savedUserId);
       if (account == null) {
         await _clearSession();
         return;
       }
 
-      final scopedRepo = _repo.forUser(account);
+      final scopedRepo = _sessionFactory.forUser(account);
       final hasProfile = await scopedRepo.hasUserProfile();
       if (!mounted) return;
 
@@ -158,6 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => ProfileMeasurementsScreen(
             repository: scopedRepo,
             locale: _currentLocale,
+            translationService: _translationService,
           ),
         ),
       );
@@ -291,9 +305,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         setModalState(() => darkMode = value);
                         final nextMode =
                             value ? ThemeMode.dark : ThemeMode.light;
-
-                        setState(() => _currentThemeMode = nextMode);
+                        if (!mounted) return;
                         widget.onThemeModeChanged(nextMode);
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
                       },
                     ),
                   ],
@@ -352,12 +368,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final account = _isRegisterMode
-          ? await _repo.registerUser(username: username, password: password)
-          : await _repo.loginUser(username: username, password: password);
+          ? await _authRepository.registerUser(
+              username: username,
+              password: password,
+            )
+          : await _authRepository.loginUser(
+              username: username,
+              password: password,
+            );
 
       await _persistSession(account.id);
 
-      final scopedRepo = _repo.forUser(account);
+      final scopedRepo = _sessionFactory.forUser(account);
       final hasProfile = await scopedRepo.hasUserProfile();
 
       if (!mounted) return;
@@ -385,6 +407,7 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => ProfileMeasurementsScreen(
             repository: scopedRepo,
             locale: _currentLocale,
+            translationService: _translationService,
           ),
         ),
       );

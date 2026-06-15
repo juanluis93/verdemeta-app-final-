@@ -8,9 +8,9 @@ abstract class FoodCatalogRepository {
 }
 
 class SqlFoodCatalogRepository implements FoodCatalogRepository {
-  final FoodRepository _foodRepository;
+  final UserSessionRepository _foodRepository;
 
-  SqlFoodCatalogRepository({FoodRepository? foodRepository})
+  SqlFoodCatalogRepository({UserSessionRepository? foodRepository})
       : _foodRepository = foodRepository ?? FoodRepository();
 
   @override

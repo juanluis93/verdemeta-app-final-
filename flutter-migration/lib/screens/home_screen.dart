@@ -216,7 +216,9 @@ class _RecipeDetail {
 }
 
 class HomeScreen extends StatefulWidget {
-  final FoodRepository repository;
+  final UserSessionRepository repository;
+  final MacroNotificationService notificationService;
+  final FoodNameTranslationService translationService;
   final Future<void> Function(BuildContext context) onLogoutRequested;
   final Locale locale;
   final ValueChanged<Locale> onLanguageChanged;
@@ -226,6 +228,8 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.repository,
+    required this.notificationService,
+    required this.translationService,
     required this.onLogoutRequested,
     required this.locale,
     required this.onLanguageChanged,
@@ -244,7 +248,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _monthlyPlannerBaseKey = 'monthly_diet_plan_v2';
   static const _buildStamp = 'DIETA-2026-04-05-C';
 
-  late final FoodRepository _repo;
+  late final UserSessionRepository _repo;
+  late final MacroNotificationService _notifications;
+  late final FoodNameTranslationService _translator;
   late Locale _currentLocale;
   late ThemeMode _currentThemeMode;
 
@@ -271,6 +277,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _lastLoadedDayKey = '';
   List<double> _weeklyCalories = [];
   List<int> _weeklyWater = [];
+  List<double> _weeklyProtein = [];
+  List<double> _weeklyCarbs = [];
+  List<double> _weeklyFat = [];
   List<String> _weeklyLabels = [];
   _MonthlyDietPlan? _monthlyDietPlan;
   bool _monthlyPlanIsValid = false;
@@ -283,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _t(String es, String en) => _isSpanish ? es : en;
 
   String _foodName(String name) {
-    return FoodNameTranslator.translate(name, _currentLocale);
+    return _translator.translate(name, _currentLocale);
   }
 
   @override
@@ -291,6 +300,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _repo = widget.repository;
+    _notifications = widget.notificationService;
+    _translator = widget.translationService;
     _currentLocale = widget.locale;
     _currentThemeMode = widget.themeMode;
     _lastLoadedDayKey = _todayKey;
@@ -393,6 +404,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final weekStats = await _repo.getDailyTotalsForDays(7);
       final List<double> weeklyCal = [];
       final List<int> weeklyWater = [];
+      final List<double> weeklyProtein = [];
+      final List<double> weeklyCarbs = [];
+      final List<double> weeklyFat = [];
       final List<String> weeklyLabels = [];
       final now = DateTime.now();
       final esDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -404,6 +418,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final stats = weekStats[key] ??
             NutritionInfo(calories: 0, protein: 0, carbs: 0, fat: 0);
         weeklyCal.add(stats.calories);
+        weeklyProtein.add(stats.protein);
+        weeklyCarbs.add(stats.carbs);
+        weeklyFat.add(stats.fat);
 
         final water = await _repo.getWaterIntake(key);
         weeklyWater.add(water);
@@ -424,6 +441,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _emojiByFoodName = emojiIndex.byName;
         _weeklyCalories = weeklyCal;
         _weeklyWater = weeklyWater;
+        _weeklyProtein = weeklyProtein;
+        _weeklyCarbs = weeklyCarbs;
+        _weeklyFat = weeklyFat;
         _weeklyLabels = weeklyLabels;
         _lastLoadedDayKey = todayKey;
         _loading = false;
@@ -450,6 +470,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _emojiByFoodName = fallbackEmojiIndex.byName;
         _weeklyCalories = List.filled(7, 0.0);
         _weeklyWater = List.filled(7, 0);
+        _weeklyProtein = List.filled(7, 0.0);
+        _weeklyCarbs = List.filled(7, 0.0);
+        _weeklyFat = List.filled(7, 0.0);
         _weeklyLabels = List.generate(7, (i) => '');
         _lastLoadedDayKey = todayKey;
         _loadError = kIsWeb
@@ -525,8 +548,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await prefs.setBool(_notificationsPreferenceKey, enabled);
 
     if (enabled) {
-      final granted =
-          await DailyMacroNotificationService.requestPermissionIfNeeded();
+        final granted =
+          await _notifications.requestPermissionIfNeeded();
       if (!granted && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -546,11 +569,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _syncDailyMacroNotification() async {
     if (!_notificationsEnabled) {
-      await DailyMacroNotificationService.cancelEndOfDaySummary();
+      await _notifications.cancelEndOfDaySummary();
       return;
     }
 
-    await DailyMacroNotificationService.scheduleEndOfDaySummary(
+    await _notifications.scheduleEndOfDaySummary(
       isSpanish: _isSpanish,
       totals: _todayTotals,
       profile: _profile,
@@ -614,6 +637,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         initialMealTime: _getCurrentMealTime(),
         excludedFoodIds: _undesiredFoodIds,
         locale: _currentLocale,
+        translationService: _translator,
       ),
     );
 
@@ -678,6 +702,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         builder: (_) => ProfileMeasurementsScreen(
           repository: _repo,
           locale: _currentLocale,
+          translationService: _translator,
         ),
       ),
     );
@@ -825,7 +850,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
 
         if (shouldLogout == true && mounted) {
-          await DailyMacroNotificationService.cancelEndOfDaySummary();
+          await _notifications.cancelEndOfDaySummary();
           if (!mounted) return;
           await widget.onLogoutRequested(context);
         }
@@ -2448,7 +2473,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _openDisplaySettings() async {
     String selectedLanguage = _currentLocale.languageCode;
-    bool darkMode = _currentThemeMode == ThemeMode.dark;
+    bool darkMode = Theme.of(context).brightness == Brightness.dark;
     bool notificationsEnabled = _notificationsEnabled;
 
     await showModalBottomSheet<void>(
@@ -2587,9 +2612,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           setModalState(() => darkMode = value);
                           final nextMode =
                               value ? ThemeMode.dark : ThemeMode.light;
-
+                          if (!mounted) return;
                           setState(() => _currentThemeMode = nextMode);
                           widget.onThemeModeChanged(nextMode);
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          }
                         },
                       ),
                       const SizedBox(height: 8),
@@ -3614,6 +3642,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _buildCalorieChartCard(),
                 const SizedBox(height: 20),
                 _buildWaterChartCard(),
+                const SizedBox(height: 20),
+                _buildMacroChartCard(),
               ],
             ),
           ),
@@ -3825,6 +3855,147 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMacroChartCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    double maxMacro = 0;
+    for (int i = 0; i < _weeklyProtein.length; i++) {
+      maxMacro = math.max(maxMacro, _weeklyProtein[i]);
+      maxMacro = math.max(maxMacro, _weeklyCarbs[i]);
+      maxMacro = math.max(maxMacro, _weeklyFat[i]);
+    }
+    if (maxMacro == 0) maxMacro = 100;
+
+    const proteinColor = Color(0xFF2E8A5E);
+    const carbsColor = Color(0xFF3F83FF);
+    const fatColor = Color(0xFFDCB33E);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2922) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.24 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _t('Gráfica de macronutrientes semanales', 'Weekly macronutrients chart'),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : const Color(0xFF223F31),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 260,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxMacro * 1.2,
+                groupsSpace: 14,
+                barTouchData: BarTouchData(enabled: true),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= _weeklyLabels.length) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            _weeklyLabels[idx],
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? Colors.white70 : Colors.grey,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: List.generate(_weeklyLabels.length, (i) {
+                  return BarChartGroupData(
+                    x: i,
+                    barsSpace: 4,
+                    barRods: [
+                      BarChartRodData(
+                        toY: _weeklyProtein[i],
+                        color: proteinColor,
+                        width: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      BarChartRodData(
+                        toY: _weeklyCarbs[i],
+                        color: carbsColor,
+                        width: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      BarChartRodData(
+                        toY: _weeklyFat[i],
+                        color: fatColor,
+                        width: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildMacroLegendItem(proteinColor, _t('Proteína', 'Protein')),
+              _buildMacroLegendItem(carbsColor, _t('Carbohidratos', 'Carbs')),
+              _buildMacroLegendItem(fatColor, _t('Grasas', 'Fat')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacroLegendItem(Color color, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white70 : Colors.grey[700],
+          ),
+        ),
+      ],
     );
   }
 

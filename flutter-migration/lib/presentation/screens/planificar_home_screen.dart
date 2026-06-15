@@ -10,7 +10,12 @@ import 'month_calendar_screen.dart';
 import 'recipe_today_screen.dart';
 
 class PlanificarHomeScreen extends ConsumerStatefulWidget {
-  const PlanificarHomeScreen({super.key});
+  const PlanificarHomeScreen({
+    super.key,
+    this.translationService = const DefaultFoodNameTranslationService(),
+  });
+
+  final FoodNameTranslationService translationService;
 
   @override
   ConsumerState<PlanificarHomeScreen> createState() =>
@@ -103,6 +108,7 @@ class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
                             }
                           });
                         },
+                        translationService: widget.translationService,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -260,6 +266,7 @@ class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
                               MaterialPageRoute(
                                 builder: (_) => DayPlanEditorScreen(
                                   date: selectedDate,
+                                  translationService: widget.translationService,
                                 ),
                               ),
                             );
@@ -306,7 +313,10 @@ class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => DayPlanEditorScreen(date: selectedDate),
+                    builder: (_) => DayPlanEditorScreen(
+                      date: selectedDate,
+                      translationService: widget.translationService,
+                    ),
                   ),
                 );
               },
@@ -319,7 +329,11 @@ class _PlanificarHomeScreenState extends ConsumerState<PlanificarHomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const RecipeTodayScreen()),
+                MaterialPageRoute(
+                  builder: (_) => RecipeTodayScreen(
+                    translationService: widget.translationService,
+                  ),
+                ),
               );
             },
             icon: const Icon(Icons.restaurant_menu_rounded),
@@ -335,11 +349,13 @@ class _UndesiredFoodsSelector extends StatelessWidget {
   final List<FoodItem> foods;
   final Set<int> selectedFoodIds;
   final ValueChanged<int> onToggle;
+  final FoodNameTranslationService translationService;
 
   const _UndesiredFoodsSelector({
     required this.foods,
     required this.selectedFoodIds,
     required this.onToggle,
+    required this.translationService,
   });
 
   @override
@@ -351,7 +367,7 @@ class _UndesiredFoodsSelector extends StatelessWidget {
       itemCount: sortedFoods.length,
       itemBuilder: (context, index) {
         final food = sortedFoods[index];
-        final displayName = FoodNameTranslator.translate(
+        final displayName = translationService.translate(
           food.name,
           Localizations.localeOf(context),
         );
