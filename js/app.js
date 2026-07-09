@@ -1426,6 +1426,7 @@ async function saveFoodLog() {
  * @param {number} id - Unique timestamp ID of the entry
  */
 async function deleteFood(id) {
+  const scrollTop = window.scrollY;
   const item = foodLog.find(f => f.id === id);
   foodLog = foodLog.filter(f => f.id !== id);
   
@@ -1433,6 +1434,9 @@ async function deleteFood(id) {
   renderDashboard();
   renderHistory();
   updateCharts();
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: scrollTop, behavior: 'auto' });
+  });
   
   if (item) showToast(`🗑️ ${item.name} eliminado`, '#b84d65');
 }

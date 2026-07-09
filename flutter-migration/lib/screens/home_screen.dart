@@ -376,7 +376,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool showLoading = true}) async {
     final todayKey = _todayKey;
     final prefs = await SharedPreferences.getInstance();
     final rawUndesiredIds = prefs.getStringList(_undesiredFoodsKey) ?? const [];
@@ -385,10 +385,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         .whereType<int>()
         .toSet();
 
-    setState(() {
-      _loading = true;
-      _loadError = null;
-    });
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
+    } else if (mounted) {
+      setState(() {
+        _loadError = null;
+      });
+    }
 
     try {
       await _repo.ensureDailyRollover(todayKey: todayKey);
@@ -668,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
 
       await _repo.logFood(entry);
-      await _loadData();
+      await _loadData(showLoading: false);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -728,7 +734,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
       );
-      await _loadData();
+      await _loadData(showLoading: false);
     }
   }
 
@@ -778,7 +784,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
 
-      await _loadData();
+      await _loadData(showLoading: false);
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
